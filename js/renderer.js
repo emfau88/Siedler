@@ -19,7 +19,7 @@ const Renderer = {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         this.drawMap();
-        this.drawFarmFields(); // WICHTIG: Vor Gebäuden zeichnen
+        this.drawFarmFields(); // VOR Gebäuden zeichnen
         this.drawGhost();
         
         for (const b of buildings) {
@@ -55,25 +55,27 @@ const Renderer = {
         
         switch(type) {
             case 0: ctx.fillStyle = '#7cb342'; break;
-            case 1: ctx.fillStyle = '#1b5e20'; break;
+            case 1: ctx.fillStyle = '#2e7d32'; break; // Dunkleres Grün für Wald
             case 2: ctx.fillStyle = '#1565c0'; break;
             case 3: ctx.fillStyle = '#757575'; break;
         }
         
         ctx.fillRect(screenX, screenY, size, size);
         
-        if (type === 1 && size > 10) {
-            ctx.fillStyle = '#2e7d32';
+        // Bäume detaillierter
+        if (type === 1 && size > 8) {
+            ctx.fillStyle = '#1b5e20';
+            ctx.beginPath();
+            ctx.arc(screenX + size/2, screenY + size/2, size*0.35, 0, Math.PI*2);
+            ctx.fill();
+        }
+        
+        if (type === 3 && size > 8) {
+            ctx.fillStyle = '#9e9e9e';
             ctx.fillRect(screenX + size*0.2, screenY + size*0.2, size*0.6, size*0.6);
         }
         
-        if (type === 3 && size > 10) {
-            ctx.fillStyle = '#9e9e9e';
-            ctx.fillRect(screenX + size*0.1, screenY + size*0.1, size*0.3, size*0.3);
-            ctx.fillRect(screenX + size*0.5, screenY + size*0.4, size*0.4, size*0.4);
-        }
-        
-        if (camera.zoom > 0.8) {
+        if (camera.zoom > 0.6) {
             ctx.strokeStyle = 'rgba(0,0,0,0.1)';
             ctx.lineWidth = 1;
             ctx.strokeRect(screenX, screenY, size, size);
@@ -88,20 +90,22 @@ const Renderer = {
             
             if (screenX + size < 0 || screenX > canvas.width || screenY + size < 0 || screenY > canvas.height) continue;
             
-            // Farben je nach Wachstumsstadium
-            const colors = ['#8d6e63', '#c8e6c9', '#81c784', '#ffeb3b']; // braun, hellgrün, grün, gelb
+            // Farben: braun (leer), hellgrün (gesät), grün (wächst), gelb (reif)
+            const colors = ['#8d6e63', '#a5d6a7', '#66bb6a', '#ffee58'];
             const emojis = ['', '🌱', '🌿', '🌾'];
             
             ctx.fillStyle = colors[field.stage];
             ctx.fillRect(screenX + 1, screenY + 1, size - 2, size - 2);
             
-            if (field.stage > 0 && size > 15) {
-                ctx.font = `${Math.floor(size * 0.5)}px Arial`;
+            // Emoji bei höheren Zoom-Stufen
+            if (field.stage > 0 && size > 12) {
+                ctx.font = `${Math.floor(size * 0.6)}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(emojis[field.stage], screenX + size/2, screenY + size/2);
             }
             
+            // Rahmen
             ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 1;
             ctx.strokeRect(screenX, screenY, size, size);
@@ -144,7 +148,7 @@ const Renderer = {
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.fillRect(screenX + 4, screenY + size - 8, size - 8, 6);
         
-        if (size > 30) {
+        if (size > 25) {
             ctx.font = `${Math.floor(size * 0.4)}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -152,7 +156,7 @@ const Renderer = {
         }
         
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.strokeRect(screenX + 2, screenY + 2, size - 4, size - 4);
         
         // Gelber Punkt wenn fertig
@@ -166,16 +170,24 @@ const Renderer = {
         // Siedler-Anzahl bei Häusern
         if (b.type === 'house' && size > 20) {
             ctx.fillStyle = '#fff';
-            ctx.font = '10px Arial';
+            ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(`${b.settlers}/${b.maxSettlers}`, screenX + size/2, screenY + size - 8);
+            ctx.fillText(`${b.settlers}/${b.maxSettlers}`, screenX + size/2, screenY + size - 6);
+        }
+        
+        // Soldaten bei Kaserne
+        if (b.type === 'barracks' && b.soldiers > 0 && size > 20) {
+            ctx.fillStyle = '#ff0000';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(`⚔️${b.soldiers}`, screenX + size - 4, screenY + 14);
         }
     },
     
     drawCarrier(c) {
         const screenX = camera.x + c.x * camera.zoom;
         const screenY = camera.y + c.y * camera.zoom;
-        const size = Math.max(4, 8 * camera.zoom);
+        const size = Math.max(4, 7 * camera.zoom);
         
         if (screenX < -10 || screenX > canvas.width + 10 || screenY < -10 || screenY > canvas.height + 10) return;
         
@@ -189,21 +201,22 @@ const Renderer = {
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Ressource anzeigen
+        // Ressource tragen
         if (c.carrying) {
             const colors = { wood: '#8b4513', stone: '#757575', food: '#ffd700' };
             ctx.fillStyle = colors[c.carrying] || '#fff';
-            ctx.fillRect(screenX - size, screenY - size*2.5, size*2, size);
+            ctx.fillRect(screenX - size, screenY - size*2, size*2, size);
         }
     },
     
     drawSoldier(s) {
         const screenX = camera.x + s.x * camera.zoom;
         const screenY = camera.y + s.y * camera.zoom;
-        const size = Math.max(6, 10 * camera.zoom);
+        const size = Math.max(5, 9 * camera.zoom);
         
         if (screenX < -10 || screenX > canvas.width + 10 || screenY < -10 || screenY > canvas.height + 10) return;
         
+        // Rotes Dreieck für Soldat
         ctx.fillStyle = '#d32f2f';
         ctx.beginPath();
         ctx.moveTo(screenX, screenY - size);
