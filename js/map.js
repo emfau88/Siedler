@@ -1,5 +1,3 @@
-// Kartengenerierung
-
 const Map = {
     init() {
         map = [];
@@ -116,6 +114,27 @@ const Map = {
                     trees.push({ x: x, y: y, age: Math.random() * 60 });
                 }
             }
+        }
+    },
+    
+    findNearestTree(fromX, fromY, maxDist = 8) {
+        let nearest = null;
+        let minDist = Infinity;
+        
+        for (const tree of trees) {
+            const dist = Math.sqrt((tree.x - fromX)**2 + (tree.y - fromY)**2);
+            if (dist < minDist && dist <= maxDist) {
+                minDist = dist;
+                nearest = tree;
+            }
+        }
+        return nearest;
+    },
+    
+    removeTree(x, y) {
+        trees = trees.filter(t => !(t.x === x && t.y === y));
+        if (y >= 0 && y < CONFIG.MAP_HEIGHT && x >= 0 && x < CONFIG.MAP_WIDTH) {
+            map[y][x] = 0;
         }
     },
     
