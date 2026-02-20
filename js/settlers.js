@@ -7,26 +7,40 @@ const Settlers = {
         this.soldiers = [];
     },
     
+    createSoldier(barracksX, barracksY) {
+        const soldier = {
+            x: (barracksX + 1.5) * CONFIG.TILE_SIZE,
+            y: (barracksY + 2.5) * CONFIG.TILE_SIZE,
+            targetX: (barracksX + 1.5) * CONFIG.TILE_SIZE,
+            targetY: (barracksY + 2.5) * CONFIG.TILE_SIZE,
+            type: 'soldier',
+            state: 'patrolling',
+            patrolCenter: { x: barracksX + 1.5, y: barracksY + 2.5 },
+            patrolRadius: 6,
+            speed: 1.2
+        };
+        this.soldiers.push(soldier);
+        console.log('Soldat erstellt, total:', this.soldiers.length);
+    },
+    
     update() {
         const hq = Buildings.getHQ();
         if (!hq) return;
         
-        // Neue Träger erstellen wenn Gebäude fertig sind und Häuser Siedler haben
+        // Neue Träger erstellen
         for (const house of Buildings.getByType('house')) {
             if (house.settlers > 0) {
-                // Suche fertiges Gebäude
                 for (const b of buildings) {
                     if ((b.type === 'lumberjack' || b.type === 'stonemason' || b.type === 'farm') && 
                         b.readyToCollect && 
                         !this.carriers.find(c => c.targetBuilding === b.id)) {
                         
-                        // Siedler wird zum Träger
                         house.settlers--;
                         Resources.pop--;
                         Resources.updateDisplay();
                         
                         this.createCarrier(house, b);
-                        break; // Nur einen pro Frame
+                        break;
                     }
                 }
             }
@@ -42,18 +56,15 @@ const Settlers = {
                     if (this.isAtTarget(c)) {
                         const building = Buildings.getById(c.targetBuilding);
                         if (building && building.readyToCollect) {
-                            // Ressource einsammeln
                             building.readyToCollect = false;
                             building.productionTimer = 0;
                             c.carrying = building.type === 'lumberjack' ? 'wood' : 
                                         building.type === 'stonemason' ? 'stone' : 'food';
-                            c.amount = building.type === 'farm' ? building.storedResource.amount : 10;
+                            c.amount = building.storedResource ? building.storedResource.amount : 10;
                             c.state = 'returning_to_hq';
                             c.targetX = (hq.tileX + 1.5) * CONFIG.TILE_SIZE;
                             c.targetY = (hq.tileY + 2.5) * CONFIG.TILE_SIZE;
-                            console.log('Träger holt', c.carrying);
                         } else {
-                            // Nichts zu holen, zurück nach Hause
                             c.state = 'returning_home';
                             this.setTargetToHome(c);
                         }
@@ -63,10 +74,8 @@ const Settlers = {
                 case 'returning_to_hq':
                     this.moveToTarget(c);
                     if (this.isAtTarget(c)) {
-                        // Abgeben
                         if (c.carrying) {
                             Resources.add(c.carrying, c.amount || 10);
-                            console.log('Träger liefert', c.carrying, 'ab');
                         }
                         c.carrying = null;
                         c.state = 'returning_home';
@@ -77,7 +86,6 @@ const Settlers = {
                 case 'returning_home':
                     this.moveToTarget(c);
                     if (this.isAtTarget(c)) {
-                        // Zurück ins Haus
                         const home = Buildings.getById(c.homeBuilding);
                         if (home && home.settlers < home.maxSettlers) {
                             home.settlers++;
@@ -85,19 +93,19 @@ const Settlers = {
                             Resources.updateDisplay();
                         }
                         this.carriers.splice(i, 1);
-                        console.log('Träger zurückgekehrt');
                     }
                     break;
             }
         }
         
-        // Soldaten
+        // Soldaten patrouillieren
         for (const soldier of this.soldiers) {
             const dx = soldier.targetX - soldier.x;
             const dy = soldier.targetY - soldier.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
             
             if (dist < soldier.speed) {
+                // Neue Zufallsposition in Patrouillenradius
                 const angle = Math.random() * Math.PI * 2;
                 const radius = Math.random() * soldier.patrolRadius * CONFIG.TILE_SIZE;
                 soldier.targetX = (soldier.patrolCenter.x * CONFIG.TILE_SIZE) + Math.cos(angle) * radius;
@@ -118,13 +126,12 @@ const Settlers = {
             type: 'carrier',
             homeBuilding: house.id,
             targetBuilding: targetBuilding.id,
-            speed: 2,
+            speed: 1.8,
             state: 'moving_to_building',
             carrying: null,
             amount: 0
         };
         this.carriers.push(carrier);
-        console.log('Neuer Träger erstellt');
     },
     
     setTargetToHome(carrier) {
@@ -152,7 +159,7 @@ const Settlers = {
     isAtTarget(entity) {
         const dx = entity.targetX - entity.x;
         const dy = entity.targetY - entity.y;
-        return Math.sqrt(dx*dx + dy*dy) < 3;
+        return Math.sqrt(dx*dx + dy*dy) < 5;
     }
 };
 
