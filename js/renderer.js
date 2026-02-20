@@ -1,5 +1,3 @@
-// Canvas Rendering
-
 const Renderer = {
     init() {
         canvas = document.getElementById('gameCanvas');
@@ -21,18 +19,19 @@ const Renderer = {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         this.drawMap();
+        this.drawFarmFields(); // WICHTIG: Vor Gebäuden zeichnen
         this.drawGhost();
         
         for (const b of buildings) {
             this.drawBuilding(b);
         }
         
-        for (const carrier of Settlers.carriers) {
-            this.drawCarrier(carrier);
+        for (const c of Settlers.carriers) {
+            this.drawCarrier(c);
         }
         
-        for (const soldier of Settlers.soldiers) {
-            this.drawSoldier(soldier);
+        for (const s of Settlers.soldiers) {
+            this.drawSoldier(s);
         }
         
         this.drawBorder();
@@ -76,6 +75,34 @@ const Renderer = {
         
         if (camera.zoom > 0.8) {
             ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(screenX, screenY, size, size);
+        }
+    },
+    
+    drawFarmFields() {
+        for (const field of farmFields) {
+            const screenX = camera.x + field.x * CONFIG.TILE_SIZE * camera.zoom;
+            const screenY = camera.y + field.y * CONFIG.TILE_SIZE * camera.zoom;
+            const size = CONFIG.TILE_SIZE * camera.zoom;
+            
+            if (screenX + size < 0 || screenX > canvas.width || screenY + size < 0 || screenY > canvas.height) continue;
+            
+            // Farben je nach Wachstumsstadium
+            const colors = ['#8d6e63', '#c8e6c9', '#81c784', '#ffeb3b']; // braun, hellgrün, grün, gelb
+            const emojis = ['', '🌱', '🌿', '🌾'];
+            
+            ctx.fillStyle = colors[field.stage];
+            ctx.fillRect(screenX + 1, screenY + 1, size - 2, size - 2);
+            
+            if (field.stage > 0 && size > 15) {
+                ctx.font = `${Math.floor(size * 0.5)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(emojis[field.stage], screenX + size/2, screenY + size/2);
+            }
+            
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.lineWidth = 1;
             ctx.strokeRect(screenX, screenY, size, size);
         }
@@ -128,21 +155,31 @@ const Renderer = {
         ctx.lineWidth = 3;
         ctx.strokeRect(screenX + 2, screenY + 2, size - 4, size - 4);
         
+        // Gelber Punkt wenn fertig
         if (b.readyToCollect) {
             ctx.fillStyle = '#ffd700';
             ctx.beginPath();
             ctx.arc(screenX + size - 10, screenY + 10, 6, 0, Math.PI * 2);
             ctx.fill();
         }
+        
+        // Siedler-Anzahl bei Häusern
+        if (b.type === 'house' && size > 20) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${b.settlers}/${b.maxSettlers}`, screenX + size/2, screenY + size - 8);
+        }
     },
     
-    drawCarrier(carrier) {
-        const screenX = camera.x + carrier.x * camera.zoom;
-        const screenY = camera.y + carrier.y * camera.zoom;
+    drawCarrier(c) {
+        const screenX = camera.x + c.x * camera.zoom;
+        const screenY = camera.y + c.y * camera.zoom;
         const size = Math.max(4, 8 * camera.zoom);
         
         if (screenX < -10 || screenX > canvas.width + 10 || screenY < -10 || screenY > canvas.height + 10) return;
         
+        // Blauer Kreis für Träger
         ctx.fillStyle = '#4169e1';
         ctx.beginPath();
         ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
@@ -152,16 +189,17 @@ const Renderer = {
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        if (carrier.carrying) {
+        // Ressource anzeigen
+        if (c.carrying) {
             const colors = { wood: '#8b4513', stone: '#757575', food: '#ffd700' };
-            ctx.fillStyle = colors[carrier.carrying] || '#fff';
-            ctx.fillRect(screenX - size, screenY - size*3, size*2, size*1.5);
+            ctx.fillStyle = colors[c.carrying] || '#fff';
+            ctx.fillRect(screenX - size, screenY - size*2.5, size*2, size);
         }
     },
     
-    drawSoldier(soldier) {
-        const screenX = camera.x + soldier.x * camera.zoom;
-        const screenY = camera.y + soldier.y * camera.zoom;
+    drawSoldier(s) {
+        const screenX = camera.x + s.x * camera.zoom;
+        const screenY = camera.y + s.y * camera.zoom;
         const size = Math.max(6, 10 * camera.zoom);
         
         if (screenX < -10 || screenX > canvas.width + 10 || screenY < -10 || screenY > canvas.height + 10) return;
