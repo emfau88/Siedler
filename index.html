@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Siedler Game - V2.1 (Verbessertes Bauen)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        #uiLayer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .ui-element {
+            pointer-events: auto;
+        }
+        
+        #resourceBar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #8b4513;
+            border-radius: 8px;
+            padding: 8px 20px;
+            display: flex;
+            gap: 25px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+        
+        .resource {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .resource-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+        
+        .wood { background: #8b4513; }
+        .stone { background: #808080; }
+        .food { background: #ffd700; }
+        .pop { background: #4169e1; }
+        
+        #minimapContainer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #8b4513;
+            border-radius: 8px;
+            padding: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        
+        #minimap {
+            width: 100px;
+            height: 100px;
+            background: #2d5016;
+            border: 1px solid #555;
+            display: block;
+        }
+        
+        #buildMenuBtn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(139, 69, 19, 0.9);
+            border: 3px solid #d2691e;
+            border-radius: 12px;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+            z-index: 20;
+        }
+        
+        #buildMenuBtn:active {
+            transform: scale(0.95);
+        }
+        
+        #buildMenuBtn.active {
+            background: rgba(210, 105, 30, 0.9);
+            border-color: #ff8c00;
+        }
+        
+        /* NEU: Horizontales Baumenü oben */
+        #buildMenu {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid #8b4513;
+            border-radius: 12px;
+            padding: 8px;
+            display: none;
+            grid-template-columns: repeat(5, 70px);
+            gap: 8px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.7);
+        }
+        
+        #buildMenu.active {
+            display: grid;
+        }
+        
+        .build-item {
+            background: rgba(139, 69, 19, 0.6);
+            border: 2px solid #d2691e;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            height: 75px;
+        }
+        
+        .build-item:hover, .build-item:active {
+            background: rgba(139, 69, 19, 0.9);
+            transform: scale(1.05);
+        }
+        
+        .build-item.selected {
+            background: rgba(255, 140, 0, 0.9);
+            border-color: #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        }
+        
+        .build-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+        
+        .build-size {
+            font-size: 8px;
+            color: #aaa;
+        }
+        
+        .build-cost {
+            font-size: 8px;
+            color: #ddd;
+            margin-top: 2px;
+        }
+        
+        #zoomControls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .zoomBtn {
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            border: 2px solid #8b4513;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        
+        .zoomBtn:active {
+            background: rgba(100,100,100,0.8);
+        }
+        
+        #info {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            pointer-events: none;
+            max-width: 200px;
+        }
+        
+        /* NEU: Build Status Anzeige */
+        #buildStatus {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0,0,0,0.9);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            display: none;
+            border: 2px solid #d2691e;
+            pointer-events: none;
+            text-align: center;
+            z-index: 15;
+        }
+        
+        /* NEU: Cancel Button */
+        #cancelBuildBtn {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(211, 47, 47, 0.9);
+            border: 3px solid #f44336;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 20;
+            animation: pulse 1.5s infinite;
+        }
+        
+        #cancelBuildBtn.active {
+            display: flex;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        #cheatInfo {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0f0;
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            display: none;
+            border: 2px solid #0f0;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="uiLayer">
+        <div id="resourceBar" class="ui-element">
+            <div class="resource">
+                <div class="resource-icon wood"></div>
+                <span id="woodCount">150</span>
+            </div>
+            <div class="resource">
+                <div class="resource-icon stone"></div>
+                <span id="stoneCount">50</span>
+            </div>
+            <div class="resource">
+                <div class="resource-icon food"></div>
+                <span id="foodCount">100</span>
+            </div>
+            <div class="resource">
+                <div class="resource-icon pop"></div>
+                <span id="popCount">5/10</span>
+            </div>
+        </div>
+        
+        <div id="minimapContainer" class="ui-element">
+            <canvas id="minimap" width="100" height="100"></canvas>
+        </div>
+        
+        <!-- NEU: Horizontales Menü oben -->
+        <div id="buildMenu" class="ui-element">
+            <div class="build-item" data-building="lumberjack" data-cost="wood:40,stone:10">
+                <div class="build-icon">🪓</div>
+                <div class="build-size">2×2</div>
+                <div>Holz</div>
+                <div class="build-cost">🪵40🪨10</div>
+            </div>
+            <div class="build-item" data-building="stonemason" data-cost="wood:50,stone:0">
+                <div class="build-icon">⛏️</div>
+                <div class="build-size">2×2</div>
+                <div>Stein</div>
+                <div class="build-cost">🪵50</div>
+            </div>
+            <div class="build-item" data-building="farm" data-cost="wood:50,stone:20">
+                <div class="build-icon">🌾</div>
+                <div class="build-size">2×2</div>
+                <div>Farm</div>
+                <div class="build-cost">🪵50🪨20</div>
+            </div>
+            <div class="build-item" data-building="house" data-cost="wood:30,stone:20">
+                <div class="build-icon">🏠</div>
+                <div class="build-size">2×2</div>
+                <div>Haus</div>
+                <div class="build-cost">🪵30🪨20</div>
+            </div>
+            <div class="build-item" data-building="barracks" data-cost="wood:80,stone:50">
+                <div class="build-icon">⚔️</div>
+                <div class="build-size">3×3</div>
+                <div>Armee</div>
+                <div class="build-cost">🪵80🪨50</div>
+            </div>
+        </div>
+        
+        <button id="buildMenuBtn" class="ui-element">🔨</button>
+        
+        <!-- NEU: Cancel Button -->
+        <button id="cancelBuildBtn" class="ui-element">✕</button>
+        
+        <div id="zoomControls">
+            <button class="zoomBtn" id="zoomIn">+</button>
+            <button class="zoomBtn" id="zoomOut">−</button>
+        </div>
+        
+        <div id="info">
+            🖱️ Ziehen = Kamera<br>
+            🔨 = Bauen | ✕ = Abbrechen<br>
+            <b>R</b> = +100 Holz | <b>S</b> = +50 Stein
+        </div>
+        
+        <!-- NEU: Build Status -->
+        <div id="buildStatus">
+            <div id="buildStatusText">Wähle eine Position</div>
+            <div style="font-size: 12px; margin-top: 5px; color: #aaa;">Tippen zum Bauen</div>
+        </div>
+        
+        <div id="cheatInfo">Cheat aktiviert!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimap');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const MAP_WIDTH = 60;
+        const MAP_HEIGHT = 45;
+        const TILE_SIZE = 32;
+        
+        const BUILDINGS = {
+            hq: { 
+                name: 'HQ', 
+                color: '#8b0000', 
+                tileSize: 3,
+                symbol: '🏰',
+                workTile: { x: 1, y: 2 }
+            },
+            lumberjack: { 
+                name: 'Holzfäller', 
+                color: '#8b4513', 
+                tileSize: 2,
+                symbol: '🪓',
+                workTile: { x: 1, y: 1 }
+            },
+            stonemason: { 
+                name: 'Steinmetz', 
+                color: '#696969', 
+                tileSize: 2,
+                symbol: '⛏️',
+                workTile: { x: 1, y: 1 }
+            },
+            farm: { 
+                name: 'Farm', 
+                color: '#daa520', 
+                tileSize: 2,
+                symbol: '🚜',
+                workTile: { x: 1, y: 1 }
+            },
+            house: { 
+                name: 'Haus', 
+                color: '#cd853f', 
+                tileSize: 2,
+                symbol: '🏠',
+                workTile: { x: 1, y: 1 }
+            },
+            barracks: { 
+                name: 'Kaserne', 
+                color: '#4a4a4a', 
+                tileSize: 3,
+                symbol: '⚔️',
+                workTile: { x: 1, y: 2 }
+            }
+        };
+        
+        let camera = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            minZoom: 0.5,
+            maxZoom: 2
+        };
+        
+        let map = [];
+        let buildings = [];
+        let settlers = [];
+        let soldiers = [];
+        let trees = [];
+        let stoneDeposits = [];
+        let farmFields = [];
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let selectedBuilding = null;
+        let mousePos = { x: 0, y: 0 };
+        let isBuildMode = false;
+        
+        let resources = {
+            wood: 150,
+            stone: 50,
+            food: 100,
+            pop: 5,
+            popMax: 10
+        };
+        
+        let gameTime = 0;
+        
+        // NEU: Ghost building Position
+        let ghostPos = { x: 0, y: 0 };
+        let showGhost = false;
+        
+        function generateStoneDeposits() {
+            for (let s = 0; s < 4; s++) {
+                let sx = Math.floor(Math.random() * (MAP_WIDTH - 6)) + 3;
+                let sy = Math.floor(Math.random() * (MAP_HEIGHT - 6)) + 3;
+                
+                if (map[sy][sx] === 2 || map[sy][sx] === 1) continue;
+                
+                const size = Math.random() < 0.5 ? 2 : 3;
+                
+                let canPlace = true;
+                for (let dy = 0; dy < size; dy++) {
+                    for (let dx = 0; dx < size; dx++) {
+                        if (map[sy + dy][sx + dx] !== 0) canPlace = false;
+                    }
+                }
+                
+                if (canPlace) {
+                    for (let dy = 0; dy < size; dy++) {
+                        for (let dx = 0; dx < size; dx++) {
+                            map[sy + dy][sx + dx] = 3;
+                        }
+                    }
+                    stoneDeposits.push({
+                        x: sx,
+                        y: sy,
+                        size: size,
+                        tiles: []
+                    });
+                }
+            }
+        }
+        
+        function initTrees() {
+            trees = [];
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    if (map[y][x] === 1) {
+                        trees.push({ x: x, y: y, age: Math.random() * 60 });
+                    }
+                }
+            }
+        }
+        
+        function generateClusteredMap() {
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                map[y] = [];
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    map[y][x] = 0;
+                }
+            }
+            
+            let riverX = Math.floor(MAP_WIDTH * 0.3);
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let w = 0; w < 2; w++) {
+                    if (riverX + w < MAP_WIDTH) map[y][riverX + w] = 2;
+                }
+                if (Math.random() < 0.3) {
+                    riverX += Math.random() < 0.5 ? 1 : -1;
+                    riverX = Math.max(2, Math.min(MAP_WIDTH - 4, riverX));
+                }
+            }
+            
+            let tributaryY = Math.floor(MAP_HEIGHT * 0.4);
+            for (let x = 0; x < MAP_WIDTH * 0.4; x++) {
+                for (let w = 0; w < 2; w++) {
+                    if (tributaryY + w < MAP_HEIGHT) map[tributaryY + w][x] = 2;
+                }
+                if (Math.random() < 0.25) {
+                    tributaryY += Math.random() < 0.5 ? 1 : -1;
+                    tributaryY = Math.max(2, Math.min(MAP_HEIGHT - 4, tributaryY));
+                }
+            }
+            
+            for (let l = 0; l < 2; l++) {
+                const cx = Math.floor(Math.random() * (MAP_WIDTH - 10)) + 5;
+                const cy = Math.floor(Math.random() * (MAP_HEIGHT - 10)) + 5;
+                const radius = Math.floor(Math.random() * 3) + 2;
+                
+                for (let y = cy - radius; y <= cy + radius; y++) {
+                    for (let x = cx - radius; x <= cx + radius; x++) {
+                        if (y >= 0 && y < MAP_HEIGHT && x >= 0 && x < MAP_WIDTH) {
+                            const dist = Math.sqrt((x-cx)**2 + (y-cy)**2);
+                            if (dist <= radius + Math.random() * 0.5) map[y][x] = 2;
+                        }
+                    }
+                }
+            }
+            
+            for (let f = 0; f < 6; f++) {
+                let fx = Math.floor(Math.random() * (MAP_WIDTH - 8)) + 4;
+                let fy = Math.floor(Math.random() * (MAP_HEIGHT - 8)) + 4;
+                if (map[fy][fx] === 2) continue;
+                
+                const forestSize = Math.floor(Math.random() * 30) + 15;
+                const queue = [{x: fx, y: fy}];
+                let placed = 0;
+                const visited = new Set();
+                
+                while (queue.length > 0 && placed < forestSize) {
+                    const current = queue.shift();
+                    const key = `${current.x},${current.y}`;
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+                    
+                    if (current.x < 0 || current.x >= MAP_WIDTH || 
+                        current.y < 0 || current.y >= MAP_HEIGHT) continue;
+                    if (map[current.y][current.x] === 2) continue;
+                    
+                    const distToCenter = Math.sqrt((current.x - fx)**2 + (current.y - fy)**2);
+                    const prob = Math.max(0.3, 1 - distToCenter / 5);
+                    
+                    if (Math.random() < prob) {
+                        map[current.y][current.x] = 1;
+                        placed++;
+                        
+                        const neighbors = [
+                            {x: current.x+1, y: current.y},
+                            {x: current.x-1, y: current.y},
+                            {x: current.x, y: current.y+1},
+                            {x: current.x, y: current.y-1}
+                        ];
+                        
+                        for (const n of neighbors) {
+                            if (!visited.has(`${n.x},${n.y}`)) queue.push(n);
+                        }
+                    }
+                }
+            }
+            
+            generateStoneDeposits();
+        }
+        
+        function canBuildHere(tileX, tileY, buildingType) {
+            const building = BUILDINGS[buildingType];
+            const size = building.tileSize;
+            
+            for (let dy = 0; dy < size; dy++) {
+                for (let dx = 0; dx < size; dx++) {
+                    const checkX = tileX + dx;
+                    const checkY = tileY + dy;
+                    
+                    if (checkX < 0 || checkX >= MAP_WIDTH || checkY < 0 || checkY >= MAP_HEIGHT) {
+                        return false;
+                    }
+                    
+                    const tile = map[checkY][checkX];
+                    if (tile !== 0 && tile !== 3) {
+                        if (buildingType !== 'stonemason' || tile !== 3) {
+                            return false;
+                        }
+                    }
+                    
+                    for (const b of buildings) {
+                        const bType = BUILDINGS[b.type];
+                        if (checkX >= b.tileX && checkX < b.tileX + bType.tileSize &&
+                            checkY >= b.tileY && checkY < b.tileY + bType.tileSize) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        
+        function addBuilding(type, tileX, tileY) {
+            const building = BUILDINGS[type];
+            const newBuilding = {
+                type: type,
+                tileX: tileX,
+                tileY: tileY,
+                x: tileX * TILE_SIZE,
+                y: tileY * TILE_SIZE,
+                id: Date.now() + Math.random(),
+                workX: tileX + building.workTile.x,
+                workY: tileY + building.workTile.y,
+                soldiers: 0,
+                maxSoldiers: 5
+            };
+            buildings.push(newBuilding);
+            
+            if (type === 'farm') {
+                for (let fy = -1; fy < 3; fy++) {
+                    for (let fx = -1; fx < 3; fx++) {
+                        if (fx >= 0 && fx < 2 && fy >= 0 && fy < 2) continue;
+                        
+                        const fieldX = tileX + fx;
+                        const fieldY = tileY + fy;
+                        
+                        if (fieldX >= 0 && fieldX < MAP_WIDTH && 
+                            fieldY >= 0 && fieldY < MAP_HEIGHT &&
+                            map[fieldY][fieldX] === 0) {
+                            farmFields.push({
+                                buildingId: newBuilding.id,
+                                x: fieldX,
+                                y: fieldY,
+                                stage: 0,
+                                progress: 0,
+                                lastUpdate: gameTime
+                            });
+                        }
+                    }
+                }
+            }
+            
+            console.log('Gebäude gebaut:', type, 'Größe:', building.tileSize + 'x' + building.tileSize);
+        }
+        
+        function placeHQ() {
+            const centerX = Math.floor(MAP_WIDTH / 2);
+            const centerY = Math.floor(MAP_HEIGHT / 2);
+            
+            for (let radius = 0; radius < 15; radius++) {
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const x = centerX + dx;
+                        const y = centerY + dy;
+                        
+                        if (canBuildHere(x, y, 'hq')) {
+                            addBuilding('hq', x, y);
+                            centerCameraOn(x + 1.5, y + 1.5);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function createSettler(startX, startY, job, targetX, targetY, carrying) {
+            return {
+                x: startX * TILE_SIZE + TILE_SIZE/2,
+                y: startY * TILE_SIZE + TILE_SIZE/2,
+                targetX: targetX * TILE_SIZE + TILE_SIZE/2,
+                targetY: targetY * TILE_SIZE + TILE_SIZE/2,
+                job: job,
+                carrying: carrying || null,
+                speed: 2,
+                state: 'moving',
+                buildingId: null
+            };
+        }
+        
+        function createSoldier(barracksX, barracksY) {
+            return {
+                x: (barracksX + 1.5) * TILE_SIZE,
+                y: (barracksY + 2.5) * TILE_SIZE,
+                targetX: (barracksX + 1.5) * TILE_SIZE,
+                targetY: (barracksY + 2.5) * TILE_SIZE,
+                state: 'idle',
+                patrolCenter: { x: barracksX + 1.5, y: barracksY + 2.5 },
+                patrolRadius: 8,
+                speed: 1.5
+            };
+        }
+        
+        function centerCameraOn(tileX, tileY) {
+            camera.x = (canvas.width / 2) - (tileX * TILE_SIZE * camera.zoom);
+            camera.y = (canvas.height / 2) - (tileY * TILE_SIZE * camera.zoom);
+        }
+        
+        function screenToTile(screenX, screenY) {
+            const tileX = Math.floor((screenX - camera.x) / (TILE_SIZE * camera.zoom));
+            const tileY = Math.floor((screenY - camera.y) / (TILE_SIZE * camera.zoom));
+            return { x: tileX, y: tileY };
+        }
+        
+        function getHQ() {
+            return buildings.find(b => b.type === 'hq');
+        }
+        
+        // GAME LOGIC
+        function updateGame() {
+            gameTime++;
+            
+            const hq = getHQ();
+            if (!hq) return;
+            
+            // HOLZFÄLLER
+            const lumberjacks = buildings.filter(b => b.type === 'lumberjack');
+            for (const lumberjack of lumberjacks) {
+                let worker = settlers.find(s => s.buildingId === lumberjack.id && s.job === 'lumberjack');
+                
+                if (!worker) {
+                    const nearestTree = findNearestTree(lumberjack.workX, lumberjack.workY);
+                    if (nearestTree && gameTime % 120 === 0) {
+                        worker = createSettler(
+                            lumberjack.workX, 
+                            lumberjack.workY, 
+                            'lumberjack',
+                            nearestTree.x,
+                            nearestTree.y,
+                            null
+                        );
+                        worker.buildingId = lumberjack.id;
+                        worker.targetTree = nearestTree;
+                        settlers.push(worker);
+                    }
+                } else if (worker.state === 'moving' && worker.targetTree) {
+                    const dx = worker.targetX - worker.x;
+                    const dy = worker.targetY - worker.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < worker.speed) {
+                        worker.state = 'working';
+                        worker.workTimer = 60;
+                    } else {
+                        worker.x += (dx / dist) * worker.speed;
+                        worker.y += (dy / dist) * worker.speed;
+                    }
+                } else if (worker.state === 'working') {
+                    worker.workTimer--;
+                    if (worker.workTimer <= 0) {
+                        removeTree(worker.targetTree.x, worker.targetTree.y);
+                        worker.carrying = 'wood';
+                        worker.state = 'returning';
+                        worker.targetX = (hq.tileX + 1.5) * TILE_SIZE;
+                        worker.targetY = (hq.tileY + 2.5) * TILE_SIZE;
+                    }
+                } else if (worker.state === 'returning') {
+                    const dx = worker.targetX - worker.x;
+                    const dy = worker.targetY - worker.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < worker.speed) {
+                        resources.wood += 10;
+                        updateResourceDisplay();
+                        settlers = settlers.filter(s => s !== worker);
+                    } else {
+                        worker.x += (dx / dist) * worker.speed;
+                        worker.y += (dy / dist) * worker.speed;
+                    }
+                }
+            }
+            
+            // STEINMETZ
+            const stonemasons = buildings.filter(b => b.type === 'stonemason');
+            for (const stonemason of stonemasons) {
+                let worker = settlers.find(s => s.buildingId === stonemason.id && s.job === 'stonemason');
+                
+                if (!worker) {
+                    const nearestStone = findNearestStone(stonemason.workX, stonemason.workY);
+                    if (nearestStone && gameTime % 150 === 0) {
+                        worker = createSettler(
+                            stonemason.workX,
+                            stonemason.workY,
+                            'stonemason',
+                            nearestStone.x,
+                            nearestStone.y,
+                            null
+                        );
+                        worker.buildingId = stonemason.id;
+                        worker.targetStone = nearestStone;
+                        settlers.push(worker);
+                    }
+                } else if (worker.state === 'moving' && worker.targetStone) {
+                    const dx = worker.targetX - worker.x;
+                    const dy = worker.targetY - worker.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < worker.speed) {
+                        worker.state = 'working';
+                        worker.workTimer = 90;
+                    } else {
+                        worker.x += (dx / dist) * worker.speed;
+                        worker.y += (dy / dist) * worker.speed;
+                    }
+                } else if (worker.state === 'working') {
+                    worker.workTimer--;
+                    if (worker.workTimer <= 0) {
+                        removeStone(worker.targetStone.x, worker.targetStone.y);
+                        worker.carrying = 'stone';
+                        worker.state = 'returning';
+                        worker.targetX = (hq.tileX + 1.5) * TILE_SIZE;
+                        worker.targetY = (hq.tileY + 2.5) * TILE_SIZE;
+                    }
+                } else if (worker.state === 'returning') {
+                    const dx = worker.targetX - worker.x;
+                    const dy = worker.targetY - worker.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < worker.speed) {
+                        resources.stone += 10;
+                        updateResourceDisplay();
+                        settlers = settlers.filter(s => s !== worker);
+                    } else {
+                        worker.x += (dx / dist) * worker.speed;
+                        worker.y += (dy / dist) * worker.speed;
+                    }
+                }
+            }
+            
+            // FARM-FELDER
+            for (const field of farmFields) {
+                field.progress++;
+                
+                if (field.stage === 0 && field.progress > 180) {
+                    field.stage = 1;
+                    field.progress = 0;
+                }
+                else if (field.stage === 1 && field.progress > 360) {
+                    field.stage = 2;
+                    field.progress = 0;
+                }
+                else if (field.stage === 2 && field.progress > 360) {
+                    field.stage = 3;
+                    field.progress = 0;
+                }
+            }
+            
+            if (gameTime % 300 === 0) {
+                const farms = buildings.filter(b => b.type === 'farm');
+                for (const farm of farms) {
+                    const farmFieldList = farmFields.filter(f => f.buildingId === farm.id && f.stage === 3);
+                    if (farmFieldList.length > 0) {
+                        const toHarvest = Math.min(farmFieldList.length, Math.floor(Math.random() * 3) + 2);
+                        for (let i = 0; i < toHarvest; i++) {
+                            farmFieldList[i].stage = 0;
+                            farmFieldList[i].progress = 0;
+                        }
+                        resources.food += toHarvest * 5;
+                        updateResourceDisplay();
+                        
+                        const carrier = createSettler(
+                            farm.workX, farm.workY, 'carrier',
+                            hq.tileX + 1, hq.tileY + 2, 'food'
+                        );
+                        settlers.push(carrier);
+                        setTimeout(() => {
+                            settlers = settlers.filter(s => s !== carrier);
+                        }, 1500);
+                    }
+                }
+            }
+            
+            // KASERNE
+            const barracksList = buildings.filter(b => b.type === 'barracks');
+            for (const barracks of barracksList) {
+                if (barracks.soldiers < barracks.maxSoldiers && gameTime % 600 === 0 && resources.food >= 10) {
+                    resources.food -= 10;
+                    barracks.soldiers++;
+                    const soldier = createSoldier(barracks.tileX, barracks.tileY);
+                    soldiers.push(soldier);
+                    updateResourceDisplay();
+                }
+            }
+            
+            // SOLDATEN
+            for (const soldier of soldiers) {
+                const dx = soldier.targetX - soldier.x;
+                const dy = soldier.targetY - soldier.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < soldier.speed) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * soldier.patrolRadius * TILE_SIZE;
+                    soldier.targetX = (soldier.patrolCenter.x * TILE_SIZE) + Math.cos(angle) * radius;
+                    soldier.targetY = (soldier.patrolCenter.y * TILE_SIZE) + Math.sin(angle) * radius;
+                } else {
+                    soldier.x += (dx / dist) * soldier.speed;
+                    soldier.y += (dy / dist) * soldier.speed;
+                }
+            }
+            
+            if (gameTime % 3600 === 0) {
+                regrowTrees();
+            }
+        }
+        
+        function findNearestTree(fromX, fromY) {
+            let nearest = null;
+            let minDist = Infinity;
+            
+            for (const tree of trees) {
+                const dist = Math.sqrt((tree.x - fromX)**2 + (tree.y - fromY)**2);
+                if (dist < minDist && dist < 12) {
+                    minDist = dist;
+                    nearest = tree;
+                }
+            }
+            return nearest;
+        }
+        
+        function findNearestStone(fromX, fromY) {
+            let nearest = null;
+            let minDist = Infinity;
+            
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    if (map[y][x] === 3) {
+                        const dist = Math.sqrt((x - fromX)**2 + (y - fromY)**2);
+                        if (dist < minDist && dist < 10) {
+                            minDist = dist;
+                            nearest = { x, y };
+                        }
+                    }
+                }
+            }
+            return nearest;
+        }
+        
+        function removeTree(x, y) {
+            trees = trees.filter(t => !(t.x === x && t.y === y));
+            map[y][x] = 0;
+        }
+        
+        function removeStone(x, y) {
+            map[y][x] = 0;
+            stoneDeposits = stoneDeposits.filter(deposit => {
+                let hasStone = false;
+                for (let dy = 0; dy < deposit.size; dy++) {
+                    for (let dx = 0; dx < deposit.size; dx++) {
+                        if (map[deposit.y + dy][deposit.x + dx] === 3) hasStone = true;
+                    }
+                }
+                return hasStone;
+            });
+        }
+        
+        function regrowTrees() {
+            const candidates = [];
+            for (let y = 1; y < MAP_HEIGHT - 1; y++) {
+                for (let x = 1; x < MAP_WIDTH - 1; x++) {
+                    if (map[y][x] === 0) {
+                        const neighbors = [
+                            map[y-1][x], map[y+1][x], map[y][x-1], map[y][x+1]
+                        ];
+                        if (neighbors.some(n => n === 1)) {
+                            candidates.push({x, y});
+                        }
+                    }
+                }
+            }
+            
+            const count = Math.min(candidates.length, Math.floor(Math.random() * 3) + 3);
+            for (let i = 0; i < count; i++) {
+                if (candidates.length === 0) break;
+                const idx = Math.floor(Math.random() * candidates.length);
+                const pos = candidates.splice(idx, 1)[0];
+                map[pos.y][pos.x] = 1;
+                trees.push({x: pos.x, y: pos.y, age: 0});
+            }
+        }
+        
+        // DRAW FUNCTIONS
+        function drawTile(x, y, type) {
+            const screenX = camera.x + x * TILE_SIZE * camera.zoom;
+            const screenY = camera.y + y * TILE_SIZE * camera.zoom;
+            const size = TILE_SIZE * camera.zoom;
+            
+            if (screenX + size < 0 || screenX > canvas.width ||
+                screenY + size < 0 || screenY > canvas.height) return;
+            
+            switch(type) {
+                case 0: ctx.fillStyle = '#7cb342'; break;
+                case 1: ctx.fillStyle = '#1b5e20'; break;
+                case 2: ctx.fillStyle = '#1565c0'; break;
+                case 3: ctx.fillStyle = '#757575'; break;
+            }
+            
+            ctx.fillRect(screenX, screenY, size, size);
+            
+            if (type === 1 && size > 10) {
+                ctx.fillStyle = '#2e7d32';
+                ctx.fillRect(screenX + size*0.2, screenY + size*0.2, size*0.6, size*0.6);
+            }
+            
+            if (type === 3 && size > 10) {
+                ctx.fillStyle = '#9e9e9e';
+                ctx.fillRect(screenX + size*0.1, screenY + size*0.1, size*0.3, size*0.3);
+                ctx.fillRect(screenX + size*0.5, screenY + size*0.4, size*0.4, size*0.4);
+                ctx.fillRect(screenX + size*0.2, screenY + size*0.6, size*0.3, size*0.3);
+            }
+            
+            if (camera.zoom > 0.8) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(screenX, screenY, size, size);
+            }
+        }
+        
+        function drawBuilding(building, isGhost = false, canBuild = true) {
+            const b = BUILDINGS[building.type];
+            const screenX = camera.x + building.x * camera.zoom;
+            const screenY = camera.y + building.y * camera.zoom;
+            const size = TILE_SIZE * b.tileSize * camera.zoom;
+            
+            if (screenX + size < 0 || screenX > canvas.width ||
+                screenY + size < 0 || screenY > canvas.height) return;
+            
+            if (isGhost) {
+                // Geister-Version: Halbtransparent
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = canBuild ? 'rgba(0,255,0,0.3)' : 'rgba(255,0,0,0.3)';
+                ctx.fillRect(screenX, screenY, size, size);
+                ctx.globalAlpha = 1.0;
+                
+                // Rahmen blinken lassen
+                const pulse = Math.sin(gameTime * 0.1) * 0.3 + 0.7;
+                ctx.strokeStyle = canBuild ? `rgba(0,255,0,${pulse})` : `rgba(255,0,0,${pulse})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([8, 4]);
+                ctx.strokeRect(screenX + 2, screenY + 2, size - 4, size - 4);
+                ctx.setLineDash([]);
+            } else {
+                // Normales Gebäude
+                ctx.fillStyle = b.color;
+                ctx.fillRect(screenX + 2, screenY + 2, size - 4, size - 4);
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(screenX + 4, screenY + size - 8, size - 8, 6);
+                
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                for (let i = 1; i < b.tileSize; i++) {
+                    const linePos = i * TILE_SIZE * camera.zoom;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + linePos, screenY);
+                    ctx.lineTo(screenX + linePos, screenY + size);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY + linePos);
+                    ctx.lineTo(screenX + size, screenY + linePos);
+                    ctx.stroke();
+                }
+                
+                if (size > 30) {
+                    ctx.font = `${Math.floor(size * 0.4)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(b.symbol, screenX + size/2, screenY + size/2);
+                }
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(screenX + 2, screenY + 2, size - 4, size - 4);
+                
+                if (building.type === 'barracks' && building.soldiers > 0) {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('⚔️' + building.soldiers, screenX + size - 5, screenY + 15);
+                }
+            }
+        }
+        
+        function drawFarmFields() {
+            for (const field of farmFields) {
+                const screenX = camera.x + field.x * TILE_SIZE * camera.zoom;
+                const screenY = camera.y + field.y * TILE_SIZE * camera.zoom;
+                const size = TILE_SIZE * camera.zoom;
+                
+                if (screenX + size < 0 || screenX > canvas.width ||
+                    screenY + size < 0 || screenY > canvas.height) continue;
+                
+                const stageColors = ['#8d6e63', '#ffeb3b', '#8bc34a', '#ffc107'];
+                const stageEmojis = ['', '🌱', '🌿', '🌾'];
+                
+                ctx.fillStyle = stageColors[field.stage];
+                ctx.fillRect(screenX + 1, screenY + 1, size - 2, size - 2);
+                
+                if (field.stage > 0 && size > 15) {
+                    ctx.font = `${Math.floor(size * 0.6)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(stageEmojis[field.stage], screenX + size/2, screenY + size/2);
+                }
+                
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(screenX, screenY, size, size);
+            }
+        }
+        
+        function drawSettler(settler) {
+            const screenX = camera.x + settler.x * camera.zoom;
+            const screenY = camera.y + settler.y * camera.zoom;
+            const size = Math.max(4, 8 * camera.zoom);
+            
+            if (screenX < -10 || screenX > canvas.width + 10 ||
+                screenY < -10 || screenY > canvas.height + 10) return;
+            
+            if (settler.job === 'stonemason') ctx.fillStyle = '#757575';
+            else if (settler.job === 'carrier') ctx.fillStyle = '#ffd700';
+            else ctx.fillStyle = '#8b4513';
+            
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            if (settler.carrying) {
+                ctx.fillStyle = settler.carrying === 'wood' ? '#8b4513' : 
+                               settler.carrying === 'stone' ? '#757575' : '#ffd700';
+                ctx.fillRect(screenX - size, screenY - size*3, size*2, size*1.5);
+            }
+        }
+        
+        function drawSoldier(soldier) {
+            const screenX = camera.x + soldier.x * camera.zoom;
+            const screenY = camera.y + soldier.y * camera.zoom;
+            const size = Math.max(6, 10 * camera.zoom);
+            
+            if (screenX < -10 || screenX > canvas.width + 10 ||
+                screenY < -10 || screenY > canvas.height + 10) return;
+            
+            ctx.fillStyle = '#d32f2f';
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY - size);
+            ctx.lineTo(screenX - size, screenY + size);
+            ctx.lineTo(screenX + size, screenY + size);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        function drawMap() {
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    drawTile(x, y, map[y][x]);
+                }
+            }
+        }
+        
+        function drawMapBorder() {
+            const mapPixelWidth = MAP_WIDTH * TILE_SIZE * camera.zoom;
+            const mapPixelHeight = MAP_HEIGHT * TILE_SIZE * camera.zoom;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(camera.x, camera.y, mapPixelWidth, mapPixelHeight);
+        }
+        
+        function drawMinimap() {
+            const scaleX = minimapCanvas.width / MAP_WIDTH;
+            const scaleY = minimapCanvas.height / MAP_HEIGHT;
+            
+            minimapCtx.fillStyle = '#1a1a1a';
+            minimapCtx.fillRect(0, 0, 100, 100);
+            
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    switch(map[y][x]) {
+                        case 0: minimapCtx.fillStyle = '#7cb342'; break;
+                        case 1: minimapCtx.fillStyle = '#1b5e20'; break;
+                        case 2: minimapCtx.fillStyle = '#1565c0'; break;
+                        case 3: minimapCtx.fillStyle = '#757575'; break;
+                    }
+                    minimapCtx.fillRect(x * scaleX, y * scaleY, scaleX, scaleY);
+                }
+            }
+            
+            for (const b of buildings) {
+                const building = BUILDINGS[b.type];
+                minimapCtx.fillStyle = building.color;
+                minimapCtx.fillRect(
+                    b.tileX * scaleX, 
+                    b.tileY * scaleY, 
+                    scaleX * building.tileSize, 
+                    scaleY * building.tileSize
+                );
+            }
+            
+            const viewX = (-camera.x / (MAP_WIDTH * TILE_SIZE * camera.zoom)) * 100;
+            const viewY = (-camera.y / (MAP_HEIGHT * TILE_SIZE * camera.zoom)) * 100;
+            const viewW = (canvas.width / (MAP_WIDTH * TILE_SIZE * camera.zoom)) * 100;
+            const viewH = (canvas.height / (MAP_HEIGHT * TILE_SIZE * camera.zoom)) * 100;
+            
+            minimapCtx.strokeStyle = '#ff0000';
+            minimapCtx.lineWidth = 2;
+            minimapCtx.strokeRect(viewX, viewY, viewW, viewH);
+        }
+        
+        function render() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawMap();
+            drawFarmFields();
+            
+            // NEU: Ghost Building zeichnen (unter anderen Gebäuden)
+            if (showGhost && selectedBuilding) {
+                const canBuild = canBuildHere(ghostPos.x, ghostPos.y, selectedBuilding);
+                const ghostBuilding = {
+                    type: selectedBuilding,
+                    x: ghostPos.x * TILE_SIZE,
+                    y: ghostPos.y * TILE_SIZE,
+                    tileX: ghostPos.x,
+                    tileY: ghostPos.y
+                };
+                drawBuilding(ghostBuilding, true, canBuild);
+            }
+            
+            for (const b of buildings) {
+                drawBuilding(b);
+            }
+            
+            for (const s of settlers) {
+                drawSettler(s);
+            }
+            
+            for (const s of soldiers) {
+                drawSoldier(s);
+            }
+            
+            drawMapBorder();
+            drawMinimap();
+        }
+        
+        function gameLoop() {
+            updateGame();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function zoomIn() {
+            if (camera.zoom < camera.maxZoom) {
+                const oldZoom = camera.zoom;
+                camera.zoom = Math.min(camera.zoom + 0.25, camera.maxZoom);
+                const zoomFactor = camera.zoom / oldZoom;
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                camera.x = centerX - (centerX - camera.x) * zoomFactor;
+                camera.y = centerY - (centerY - camera.y) * zoomFactor;
+            }
+        }
+        
+        function zoomOut() {
+            if (camera.zoom > camera.minZoom) {
+                const oldZoom = camera.zoom;
+                camera.zoom = Math.max(camera.zoom - 0.25, camera.minZoom);
+                const zoomFactor = camera.zoom / oldZoom;
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                camera.x = centerX - (centerX - camera.x) * zoomFactor;
+                camera.y = centerY - (centerY - camera.y) * zoomFactor;
+            }
+        }
+        
+        function canAfford(costStr) {
+            const costs = costStr.split(',');
+            for (const cost of costs) {
+                const [res, amount] = cost.split(':');
+                if (resources[res] < parseInt(amount)) return false;
+            }
+            return true;
+        }
+        
+        function deductCost(costStr) {
+            const costs = costStr.split(',');
+            for (const cost of costs) {
+                const [res, amount] = cost.split(':');
+                resources[res] -= parseInt(amount);
+            }
+            updateResourceDisplay();
+        }
+        
+        function updateResourceDisplay() {
+            document.getElementById('woodCount').textContent = resources.wood;
+            document.getElementById('stoneCount').textContent = resources.stone;
+            document.getElementById('foodCount').textContent = resources.food;
+            document.getElementById('popCount').textContent = resources.pop + '/' + resources.popMax;
+        }
+        
+        // NEU: Verbesserte Build-Funktion
+        function tryBuild(tileX, tileY) {
+            if (!selectedBuilding) return false;
+            
+            if (canBuildHere(tileX, tileY, selectedBuilding)) {
+                const cost = document.querySelector(`[data-building="${selectedBuilding}"]`).dataset.cost;
+                deductCost(cost);
+                addBuilding(selectedBuilding, tileX, tileY);
+                
+                // Erfolg - Bau-Modus beenden
+                exitBuildMode();
+                return true;
+            } else {
+                // Fehlerton oder visuelles Feedback
+                return false;
+            }
+        }
+        
+        // NEU: Bau-Modus beenden
+        function exitBuildMode() {
+            selectedBuilding = null;
+            isBuildMode = false;
+            showGhost = false;
+            document.getElementById('buildStatus').style.display = 'none';
+            document.getElementById('cancelBuildBtn').classList.remove('active');
+            document.querySelectorAll('.build-item').forEach(i => i.classList.remove('selected'));
+        }
+        
+        // CHEATS
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                resources.wood += 100;
+                updateResourceDisplay();
+                showCheat('+100 Holz!');
+            }
+            if (e.key === 's' || e.key === 'S') {
+                resources.stone += 50;
+                updateResourceDisplay();
+                showCheat('+50 Stein!');
+            }
+            if (e.key === 'Escape') {
+                exitBuildMode();
+            }
+        });
+        
+        function showCheat(text) {
+            const cheatInfo = document.getElementById('cheatInfo');
+            cheatInfo.textContent = text;
+            cheatInfo.style.display = 'block';
+            setTimeout(() => {
+                cheatInfo.style.display = 'none';
+            }, 1000);
+        }
+        
+        // EVENTS
+        document.getElementById('minimapContainer').addEventListener('click', (e) => {
+            const rect = minimapCanvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            const mapX = (clickX / 100) * MAP_WIDTH;
+            const mapY = (clickY / 100) * MAP_HEIGHT;
+            
+            camera.x = (canvas.width / 2) - (mapX * TILE_SIZE * camera.zoom);
+            camera.y = (canvas.height / 2) - (mapY * TILE_SIZE * camera.zoom);
+        });
+        
+        const buildMenuBtn = document.getElementById('buildMenuBtn');
+        const buildMenu = document.getElementById('buildMenu');
+        const cancelBuildBtn = document.getElementById('cancelBuildBtn');
+        const buildStatus = document.getElementById('buildStatus');
+        const buildStatusText = document.getElementById('buildStatusText');
+        
+        // Menü Toggle
+        buildMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            if (isBuildMode) {
+                // Wenn im Bau-Modus, Menü nicht schließen sondern nur togglen
+                buildMenu.classList.toggle('active');
+            } else {
+                buildMenu.classList.toggle('active');
+                buildMenuBtn.classList.toggle('active');
+            }
+        });
+        
+        // Gebäude auswählen
+        document.querySelectorAll('.build-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const building = e.currentTarget.dataset.building;
+                const cost = e.currentTarget.dataset.cost;
+                
+                if (!canAfford(cost)) {
+                    alert('Nicht genug Ressourcen!');
+                    return;
+                }
+                
+                // Menü sofort schließen
+                buildMenu.classList.remove('active');
+                
+                // Bau-Modus aktivieren
+                selectedBuilding = building;
+                isBuildMode = true;
+                showGhost = true;
+                
+                // UI aktualisieren
+                document.querySelectorAll('.build-item').forEach(i => i.classList.remove('selected'));
+                e.currentTarget.classList.add('selected');
+                
+                // Status anzeigen
+                const buildingName = BUILDINGS[building].name;
+                buildStatusText.textContent = `${buildingName} bauen`;
+                buildStatus.style.display = 'block';
+                
+                // Cancel-Button zeigen
+                cancelBuildBtn.classList.add('active');
+                
+                // Hammer-Button deaktivieren visuell
+                buildMenuBtn.classList.remove('active');
+            });
+        });
+        
+        // Cancel Button
+        cancelBuildBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exitBuildMode();
+        });
+        
+        // NEU: Verbesserte Maus/Touch Handling
+        canvas.addEventListener('mousedown', (e) => {
+            mousePos.x = e.clientX;
+            mousePos.y = e.clientY;
+            
+            if (isBuildMode) {
+                // Im Bau-Modus: Bauen oder nichts tun
+                const tile = screenToTile(e.clientX, e.clientY);
+                tryBuild(tile.x, tile.y);
+                // Nicht ziehen im Bau-Modus
+                isDragging = false;
+            } else {
+                // Normaler Modus: Kamera ziehen
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            mousePos.x = e.clientX;
+            mousePos.y = e.clientY;
+            
+            // Ghost Position aktualisieren
+            if (isBuildMode && showGhost) {
+                const tile = screenToTile(e.clientX, e.clientY);
+                ghostPos.x = tile.x;
+                ghostPos.y = tile.y;
+            }
+            
+            if (isDragging && !isBuildMode) {
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                camera.x += deltaX;
+                camera.y += deltaY;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.style.cursor = 'default';
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+            canvas.style.cursor = 'default';
+        });
+        
+        // Touch Events
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mousePos.x = touch.clientX;
+            mousePos.y = touch.clientY;
+            
+            if (isBuildMode) {
+                const tile = screenToTile(touch.clientX, touch.clientY);
+                tryBuild(tile.x, tile.y);
+                isDragging = false;
+            } else {
+                isDragging = true;
+                lastMouseX = touch.clientX;
+                lastMouseY = touch.clientY;
+            }
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                mousePos.x = touch.clientX;
+                mousePos.y = touch.clientY;
+                
+                // Ghost aktualisieren
+                if (isBuildMode && showGhost) {
+                    const tile = screenToTile(touch.clientX, touch.clientY);
+                    ghostPos.x = tile.x;
+                    ghostPos.y = tile.y;
+                }
+                
+                if (isDragging && !isBuildMode) {
+                    const deltaX = touch.clientX - lastMouseX;
+                    const deltaY = touch.clientY - lastMouseY;
+                    camera.x += deltaX;
+                    camera.y += deltaY;
+                    lastMouseX = touch.clientX;
+                    lastMouseY = touch.clientY;
+                }
+            }
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+        
+        document.getElementById('zoomIn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            zoomIn();
+        });
+        
+        document.getElementById('zoomOut').addEventListener('click', (e) => {
+            e.stopPropagation();
+            zoomOut();
+        });
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // INIT
+        generateClusteredMap();
+        initTrees();
+        placeHQ();
+        updateResourceDisplay();
+        gameLoop();
+        
+        console.log('Siedler V2.1: Verbessertes Bau-System aktiviert');
+    </script>
+</body>
+</html>
