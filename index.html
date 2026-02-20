@@ -33,7 +33,6 @@
             <canvas id="minimap" width="100" height="100"></canvas>
         </div>
         
-        <!-- Baumenü (wird bei Auswahl ausgeblendet) -->
         <div id="buildMenu" class="ui-element">
             <div class="build-item" data-building="lumberjack" data-cost="wood:40,stone:10">
                 <div class="build-icon">🪓</div>
@@ -89,7 +88,7 @@
         <div id="cheatInfo">Cheat aktiviert!</div>
     </div>
 
-    <!-- Module laden -->
+    <!-- WICHTIG: Reihenfolge beachten! config.js MUSS zuerst geladen werden -->
     <script src="js/config.js"></script>
     <script src="js/resources.js"></script>
     <script src="js/map.js"></script>
