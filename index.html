@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Siedler 2.0 - Grenzen & Militär</title>
+    <title>Siedler 2.0 - Korrigiert</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
         body { overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -18,8 +18,10 @@
             padding: 10px 25px; display: flex; gap: 30px; color: white; 
             font-size: 14px; font-weight: bold;
             box-shadow: 0 6px 20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+            flex-wrap: wrap; justify-content: center; max-width: 95vw;
+            cursor: pointer;
         }
-        .resource { display: flex; align-items: center; gap: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .resource { display: flex; align-items: center; gap: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); position: relative; }
         .resource-icon { width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
         .wood { background: linear-gradient(135deg, #8b4513, #654321); }
         .stone { background: linear-gradient(135deg, #808080, #606060); }
@@ -27,6 +29,10 @@
         .pop { background: linear-gradient(135deg, #4169e1, #27408b); }
         .planks { background: linear-gradient(135deg, #deb887, #8b7355); }
         .weapons { background: linear-gradient(135deg, #dc143c, #8b0000); }
+        .resource-bar { position: absolute; bottom: -4px; left: 0; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; width: 100%; overflow: hidden; }
+        .resource-fill { height: 100%; background: #4caf50; transition: width 0.3s, background 0.3s; }
+        .resource-fill.warning { background: #ff9800; }
+        .resource-fill.critical { background: #f44336; }
         
         #territoryInfo {
             position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
@@ -83,7 +89,7 @@
         #zoomControls { position: absolute; bottom: 25px; left: 25px; display: flex; flex-direction: column; gap: 12px; }
         .zoomBtn { 
             width: 55px; height: 55px; font-size: 28px; 
-            background: linear-gradient(135deg, rgba(30,30,30,0.95), rgba(20,20,20,0.95));
+            background: linear-gradient(135deg, rgba(30,30,30,0.95), rgba(20,20,30,0.95));
             color: white; border: 2px solid #8b4513; border-radius: 12px; 
             cursor: pointer; user-select: none; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
@@ -145,6 +151,7 @@
             font-weight: bold; display: none; border: 2px solid #ff4444;
             box-shadow: 0 6px 25px rgba(139, 0, 0, 0.5);
             animation: slideDown 0.3s ease-out;
+            z-index: 100;
         }
         @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
         
@@ -154,7 +161,42 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.9); display: none;
             background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px;
             border: 2px solid #ff4444;
+            z-index: 50;
         }
+        
+        #storageDetails {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: linear-gradient(180deg, rgba(30,30,30,0.98), rgba(20,20,20,0.98));
+            border: 3px solid #8b4513; border-radius: 16px;
+            padding: 20px; display: none; flex-direction: column;
+            color: white; font-size: 14px; min-width: 300px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+            z-index: 30;
+            pointer-events: auto;
+        }
+        #storageDetails.active { display: flex; }
+        .storage-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #444; }
+        .storage-row:last-child { border-bottom: none; }
+        .close-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: #f44336; border: none; color: white;
+            width: 30px; height: 30px; border-radius: 50%;
+            cursor: pointer; font-size: 18px; display: flex;
+            align-items: center; justify-content: center;
+        }
+        
+        #gameSpeedControl {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.8); border: 2px solid #8b4513;
+            border-radius: 8px; padding: 8px; color: white;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .speed-btn {
+            background: #8b4513; border: none; color: white;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer;
+            font-weight: bold;
+        }
+        .speed-btn.active { background: #d2691e; }
     </style>
 <base target="_blank">
 </head>
@@ -162,13 +204,49 @@
     <canvas id="gameCanvas"></canvas>
     
     <div id="uiLayer">
-        <div id="resourceBar" class="ui-element">
-            <div class="resource"><div class="resource-icon wood">🪵</div><span id="woodCount">400</span></div>
-            <div class="resource"><div class="resource-icon stone">🪨</div><span id="stoneCount">200</span></div>
-            <div class="resource"><div class="resource-icon food">🍞</div><span id="foodCount">300</span></div>
-            <div class="resource"><div class="resource-icon pop">👥</div><span id="popCount">5/5</span></div>
-            <div class="resource"><div class="resource-icon planks">📦</div><span id="plankCount">0</span></div>
-            <div class="resource"><div class="resource-icon weapons">⚔️</div><span id="weaponCount">0</span></div>
+        <div id="gameSpeedControl" class="ui-element">
+            <span>⚡</span>
+            <button class="speed-btn active" onclick="game.setSpeed(1)">1x</button>
+            <button class="speed-btn" onclick="game.setSpeed(2)">2x</button>
+            <button class="speed-btn" onclick="game.setSpeed(3)">3x</button>
+        </div>
+        
+        <div id="resourceBar" class="ui-element" onclick="game.toggleStorageDetails()">
+            <div class="resource">
+                <div class="resource-icon wood">🪵</div>
+                <span id="woodCount">800</span>
+                <div class="resource-bar"><div class="resource-fill" id="woodBar" style="width: 0%"></div></div>
+            </div>
+            <div class="resource">
+                <div class="resource-icon stone">🪨</div>
+                <span id="stoneCount">400</span>
+                <div class="resource-bar"><div class="resource-fill" id="stoneBar" style="width: 0%"></div></div>
+            </div>
+            <div class="resource">
+                <div class="resource-icon food">🍞</div>
+                <span id="foodCount">400</span>
+                <div class="resource-bar"><div class="resource-fill" id="foodBar" style="width: 0%"></div></div>
+            </div>
+            <div class="resource">
+                <div class="resource-icon pop">👥</div>
+                <span id="popCount">5/5</span>
+            </div>
+            <div class="resource">
+                <div class="resource-icon planks">📦</div>
+                <span id="plankCount">0</span>
+                <div class="resource-bar"><div class="resource-fill" id="planksBar" style="width: 0%"></div></div>
+            </div>
+            <div class="resource">
+                <div class="resource-icon weapons">⚔️</div>
+                <span id="weaponCount">0</span>
+                <div class="resource-bar"><div class="resource-fill" id="weaponsBar" style="width: 0%"></div></div>
+            </div>
+        </div>
+        
+        <div id="storageDetails" class="ui-element">
+            <button class="close-btn" onclick="game.toggleStorageDetails()">×</button>
+            <h3 style="margin-bottom: 15px; text-align: center; color: #d2691e;">📦 Lagerbestände</h3>
+            <div id="storageContent"></div>
         </div>
         
         <div id="territoryInfo" class="ui-element">🏰 Territorium: <span id="territorySize">400</span> Tiles</div>
@@ -202,7 +280,8 @@
         <div id="info">
             🖱️ <b>Ziehen</b> = Kamera<br>
             🔨 = Bauen | ✕ = Abbrechen<br>
-            <b>R</b> = +100 Holz | <b>S</b> = +50 Stein
+            <b>R</b> = +100 Holz | <b>S</b> = +50 Stein<br>
+            <b>Klick auf Ressourcen</b> = Lagerdetails
         </div>
         
         <div id="buildStatus">
@@ -217,7 +296,7 @@
         </div>
         
         <div id="notification"></div>
-        <div id="storageWarning">⚠️ LAGER VOLL!</div>
+        <div id="storageWarning">⚠️ LAGER FAST VOLL!</div>
     </div>
 
 <script>
@@ -226,7 +305,7 @@ const CONFIG = {
     CAMERA: { minZoom: 0.3, maxZoom: 2.5, defaultZoom: 0.7 },
     GAME_SPEED: 1.0, START_TERRITORY_RADIUS: 10, WATCHTOWER_RADIUS: 15,
     FOG_DARKNESS: 0.85, MAX_BARRACKS: 3,
-    STORAGE_LIMITS: { wood: 500, stone: 300, food: 400, planks: 200, weapons: 50 },
+    STORAGE_LIMITS: { wood: 800, stone: 500, food: 600, planks: 300, weapons: 100 },
     WEAPON_COSTS: { spear: { wood: 2, planks: 0, food: 0 }, bow: { wood: 2, planks: 1, food: 1 } }
 };
 
@@ -240,7 +319,7 @@ const BUILDINGS = {
     bakery: { name: 'Bäckerei', color: '#d2691e', tileSize: 2, symbol: '🥖', workTile: { x: 1, y: 1 }, cost: { wood: 80, stone: 60, planks: 30 }, buildTime: 400, maxWorkers: 1, produces: 'food', workTime: 200, input: { flour: 2 }, output: { food: 5 } },
     weaponsmith: { name: 'Waffenschmiede', color: '#4a4a4a', tileSize: 3, symbol: '🔨', workTile: { x: 1, y: 1 }, cost: { wood: 120, stone: 80, planks: 20 }, buildTime: 500, maxWorkers: 2, produces: 'weapons', workTime: 300 },
     house: { name: 'Haus', color: '#cd853f', tileSize: 2, symbol: '🏠', workTile: { x: 1, y: 1 }, cost: { wood: 30, stone: 20 }, buildTime: 200, maxWorkers: 0, spawnRate: 600 },
-    storage: { name: 'Speicher', color: '#8b7355', tileSize: 3, symbol: '📦', workTile: { x: 1, y: 1 }, cost: { wood: 100, stone: 50 }, buildTime: 400, maxWorkers: 0, storageBonus: { wood: 300, stone: 200, food: 200, planks: 100, weapons: 30 } },
+    storage: { name: 'Speicher', color: '#8b7355', tileSize: 3, symbol: '📦', workTile: { x: 1, y: 1 }, cost: { wood: 100, stone: 50 }, buildTime: 400, maxWorkers: 0, storageBonus: { wood: 400, stone: 300, food: 300, planks: 200, weapons: 50 } },
     barracks: { name: 'Kaserne', color: '#4a0000', tileSize: 3, symbol: '⚔️', workTile: { x: 1, y: 2 }, cost: { wood: 150, stone: 80 }, buildTime: 600, maxWorkers: 0 },
     watchtower: { name: 'Wachturm', color: '#2f4f4f', tileSize: 2, symbol: '🗼', workTile: { x: 0, y: 2 }, cost: { wood: 200, stone: 100 }, buildTime: 500, maxWorkers: 0, requiresSoldiers: 2, territoryRadius: 15 }
 };
@@ -251,7 +330,7 @@ let map = [], buildings = [], trees = [], stoneDeposits = [], mountains = [];
 let gameTime = 0, isDragging = false, lastMouseX = 0, lastMouseY = 0, mousePos = { x: 0, y: 0 };
 let selectedBuilding = null, isBuildMode = false, selectedBarracks = null;
 let settlers = [], workers = [], soldiers = [], enemies = [], particles = [];
-let Resources = { wood: 400, stone: 200, food: 300, planks: 0, grain: 0, flour: 0, weapons: 0, pop: 5, popMax: 5 };
+let Resources = { wood: 800, stone: 400, food: 400, planks: 0, grain: 0, flour: 0, weapons: 0, pop: 5, popMax: 5 };
 let territoryCenters = [], fogMap = [];
 let storageLimits = { ...CONFIG.STORAGE_LIMITS };
 let updateAccumulator = 0;
@@ -271,6 +350,50 @@ const game = {
         this.initTerritory();
         this.updateResourceDisplay();
         requestAnimationFrame(() => this.loop());
+    },
+    
+    setSpeed(speed) {
+        CONFIG.GAME_SPEED = speed;
+        document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        this.showNotification(`⚡ Spielgeschwindigkeit: ${speed}x`);
+    },
+    
+    toggleStorageDetails() {
+        const panel = document.getElementById('storageDetails');
+        panel.classList.toggle('active');
+        if (panel.classList.contains('active')) {
+            this.updateStorageDetails();
+        }
+    },
+    
+    updateStorageDetails() {
+        const content = document.getElementById('storageContent');
+        content.innerHTML = '';
+        
+        const resources = [
+            { key: 'wood', name: '🪵 Holz', limit: storageLimits.wood },
+            { key: 'stone', name: '🪨 Stein', limit: storageLimits.stone },
+            { key: 'food', name: '🍞 Nahrung', limit: storageLimits.food },
+            { key: 'planks', name: '📦 Bretter', limit: storageLimits.planks },
+            { key: 'weapons', name: '⚔️ Waffen', limit: storageLimits.weapons },
+            { key: 'grain', name: '🌾 Getreide', limit: 9999 },
+            { key: 'flour', name: '🌪️ Mehl', limit: 9999 }
+        ];
+        
+        for (const res of resources) {
+            const current = Math.floor(Resources[res.key] || 0);
+            const percent = res.limit > 0 ? (current / res.limit * 100) : 0;
+            const color = percent > 90 ? '#f44336' : percent > 70 ? '#ff9800' : '#4caf50';
+            
+            const row = document.createElement('div');
+            row.className = 'storage-row';
+            row.innerHTML = `
+                <span>${res.name}</span>
+                <span style="color: ${color}">${current} / ${res.limit > 9000 ? '∞' : res.limit}</span>
+            `;
+            content.appendChild(row);
+        }
     },
     
     resize() {
@@ -480,7 +603,9 @@ const game = {
             id: Date.now() + Math.random(), workX: tileX + def.workTile.x, workY: tileY + def.workTile.y,
             constructionProgress: 0, maxConstructionProgress: def.buildTime || 100, isComplete: type === 'hq',
             woodDelivered: 0, stoneDelivered: 0, planksDelivered: 0,
-            woodNeeded: def.cost ? (def.cost.wood || 0) : 0, stoneNeeded: def.cost ? (def.cost.stone || 0) : 0, planksNeeded: def.cost ? (def.cost.planks || 0) : 0,
+            woodNeeded: def.cost ? (def.cost.wood || 0) : 0, 
+            stoneNeeded: def.cost ? (def.cost.stone || 0) : 0, 
+            planksNeeded: def.cost ? (def.cost.planks || 0) : 0,
             workers: [], spawnTimer: 0, soldiers: 0, productionTimer: 0, inputStorage: {}, outputStorage: {}
         };
         buildings.push(b);
@@ -541,7 +666,9 @@ const game = {
     },
     
     checkStorageLimit(resource, amount) {
-        return (Resources[resource] || 0) + amount <= (storageLimits[resource] || 9999);
+        const limit = storageLimits[resource] || 9999;
+        const current = Resources[resource] || 0;
+        return current + amount <= limit;
     },
     
     updateProduction() {
@@ -549,7 +676,7 @@ const game = {
             if (!b.isComplete) continue;
             const def = BUILDINGS[b.type];
             
-            if (b.type === 'sawmill' && b.inputStorage.wood >= 2 && this.checkStorageLimit('planks', 1)) {
+            if (b.type === 'sawmill' && (b.inputStorage.wood || 0) >= 2 && this.checkStorageLimit('planks', 1)) {
                 b.productionTimer += CONFIG.GAME_SPEED;
                 if (b.productionTimer >= def.workTime) {
                     b.productionTimer = 0;
@@ -559,7 +686,7 @@ const game = {
                     this.createParticle(b.entranceX, b.entranceY, 'planks');
                 }
             }
-            else if (b.type === 'mill' && b.inputStorage.grain >= 2) {
+            else if (b.type === 'mill' && (b.inputStorage.grain || 0) >= 2) {
                 b.productionTimer += CONFIG.GAME_SPEED;
                 if (b.productionTimer >= def.workTime) {
                     b.productionTimer = 0;
@@ -567,7 +694,7 @@ const game = {
                     b.outputStorage.flour = (b.outputStorage.flour || 0) + 1;
                 }
             }
-            else if (b.type === 'bakery' && b.inputStorage.flour >= 2 && this.checkStorageLimit('food', 5)) {
+            else if (b.type === 'bakery' && (b.inputStorage.flour || 0) >= 2 && this.checkStorageLimit('food', 5)) {
                 b.productionTimer += CONFIG.GAME_SPEED;
                 if (b.productionTimer >= def.workTime) {
                     b.productionTimer = 0;
@@ -671,23 +798,70 @@ const game = {
         }
     },
     
+    // 🔧 HIER IST DER WICHTIGE FIX FÜR DIE SCHMIEDE!
     findCarrierJob() {
+        // Baustellen mit Materialbedarf - PLANKS PRIORITÄT!
         for (const site of buildings) {
             if (!site.isComplete) {
                 const hq = buildings[0];
+                
+                // 🔥 FIX #1: Planks werden jetzt erkannt und transportiert!
+                if (site.planksDelivered < site.planksNeeded && Resources.planks >= 5) {
+                    return { 
+                        type: 'to_building', 
+                        resource: 'planks',  // <-- DAS FEHLTE IM ORIGINAL!
+                        amount: Math.min(5, site.planksNeeded - site.planksDelivered), 
+                        fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, 
+                        fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, 
+                        toX: site.entranceX, 
+                        toY: site.entranceY, 
+                        toBuilding: site.id 
+                    };
+                }
+                
                 if (site.woodDelivered < site.woodNeeded && Resources.wood >= 10) {
-                    return { type: 'to_building', resource: 'wood', amount: Math.min(10, site.woodNeeded - site.woodDelivered), fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, toX: site.entranceX, toY: site.entranceY, toBuilding: site.id };
+                    return { 
+                        type: 'to_building', 
+                        resource: 'wood', 
+                        amount: Math.min(10, site.woodNeeded - site.woodDelivered), 
+                        fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, 
+                        fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, 
+                        toX: site.entranceX, 
+                        toY: site.entranceY, 
+                        toBuilding: site.id 
+                    };
                 }
                 if (site.stoneDelivered < site.stoneNeeded && Resources.stone >= 10) {
-                    return { type: 'to_building', resource: 'stone', amount: Math.min(10, site.stoneNeeded - site.stoneDelivered), fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, toX: site.entranceX, toY: site.entranceY, toBuilding: site.id };
+                    return { 
+                        type: 'to_building', 
+                        resource: 'stone', 
+                        amount: Math.min(10, site.stoneNeeded - site.stoneDelivered), 
+                        fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, 
+                        fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, 
+                        toX: site.entranceX, 
+                        toY: site.entranceY, 
+                        toBuilding: site.id 
+                    };
                 }
             }
         }
         
+        // Produktionsgebäude
         for (const b of buildings) {
-            if (b.isComplete && b.type === 'sawmill' && (b.inputStorage.wood || 0) < 10 && Resources.wood >= 5) {
+            if (!b.isComplete) continue;
+            
+            if (b.type === 'sawmill' && (b.inputStorage.wood || 0) < 10 && Resources.wood >= 5) {
                 const hq = buildings[0];
-                return { type: 'production_input', resource: 'wood', amount: 5, fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, toX: b.entranceX, toY: b.entranceY, toBuilding: b.id };
+                return { 
+                    type: 'production_input', 
+                    resource: 'wood', 
+                    amount: 5, 
+                    fromX: (hq.workX + 0.5) * CONFIG.TILE_SIZE, 
+                    fromY: (hq.workY + 0.5) * CONFIG.TILE_SIZE, 
+                    toX: b.entranceX, 
+                    toY: b.entranceY, 
+                    toBuilding: b.id 
+                };
             }
         }
         return null;
@@ -1027,11 +1201,27 @@ const game = {
     
     checkStorageWarning() {
         const warning = document.getElementById('storageWarning');
+        let almostFull = false;
         let full = false;
         for (const [res, limit] of Object.entries(storageLimits)) {
-            if (Resources[res] >= limit * 0.9) { full = true; break; }
+            const current = Resources[res] || 0;
+            if (current >= limit * 0.98) full = true;
+            else if (current >= limit * 0.90) almostFull = true;
         }
-        warning.style.display = full ? 'block' : 'none';
+        
+        if (full) {
+            warning.textContent = '⚠️ LAGER VOLL!';
+            warning.style.display = 'block';
+            warning.style.borderColor = '#f44336';
+            warning.style.color = '#f44336';
+        } else if (almostFull) {
+            warning.textContent = '⚠️ Lager fast voll';
+            warning.style.display = 'block';
+            warning.style.borderColor = '#ff9800';
+            warning.style.color = '#ff9800';
+        } else {
+            warning.style.display = 'none';
+        }
     },
     
     moveEntity(e) {
@@ -1262,6 +1452,20 @@ const game = {
         document.getElementById('plankCount').textContent = Math.floor(Resources.planks);
         document.getElementById('weaponCount').textContent = Math.floor(Resources.weapons);
         
+        // Update resource bars
+        const updateBar = (res, id) => {
+            const percent = (Resources[res] / storageLimits[res]) * 100;
+            const bar = document.getElementById(id);
+            bar.style.width = Math.min(percent, 100) + '%';
+            bar.className = 'resource-fill' + (percent > 90 ? ' critical' : percent > 70 ? ' warning' : '');
+        };
+        
+        updateBar('wood', 'woodBar');
+        updateBar('stone', 'stoneBar');
+        updateBar('food', 'foodBar');
+        updateBar('planks', 'planksBar');
+        updateBar('weapons', 'weaponsBar');
+        
         let territoryTiles = 0;
         for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
             for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
@@ -1270,6 +1474,11 @@ const game = {
         }
         document.getElementById('territorySize').textContent = territoryTiles;
         document.getElementById('territoryInfo').style.display = 'block';
+        
+        // Update storage details if open
+        if (document.getElementById('storageDetails').classList.contains('active')) {
+            this.updateStorageDetails();
+        }
     },
     
     // RENDERING
@@ -1410,7 +1619,7 @@ const game = {
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 9px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(`🪵${b.woodDelivered}/${b.woodNeeded} 🪨${b.stoneDelivered}/${b.stoneNeeded}`, sx + sz/2, sy - 25);
+                    ctx.fillText(`🪵${b.woodDelivered}/${b.woodNeeded} 🪨${b.stoneDelivered}/${b.stoneNeeded} 📦${b.planksDelivered}/${b.planksNeeded}`, sx + sz/2, sy - 25);
                 }
                 
                 if (matProgress >= 1) {
