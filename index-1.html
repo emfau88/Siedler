@@ -1,0 +1,2491 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Siedler 2.0 - Korrigiert</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
+        body { overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #gameCanvas { display:block; position:absolute; top:0; left:0; width:100vw; height:100vh; z-index:1; }
+        #uiLayer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; background:transparent; }
+        .ui-element { pointer-events: auto; }
+        
+        
+        #topHUD{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 20;
+        }
+        #topHUD > .ui-element, #topHUD > #settingsBtn { pointer-events: auto; }
+
+        #settingsBtn.hud-btn{
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.85);
+            border: 2px solid #8b4513;
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #settingsPanel{
+            position: absolute;
+            top: 54px;
+            left: 10px;
+            width: min(320px, calc(100vw - 20px));
+            background: linear-gradient(180deg, rgba(20,20,20,0.98), rgba(10,10,10,0.98));
+            border: 2px solid #8b4513;
+            border-radius: 14px;
+            padding: 12px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+            display: none;
+            z-index: 30;
+        }
+        #settingsPanel.open{ display: block; }
+        #settingsPanel .settings-title{
+            font-weight: 800;
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        #settingsPanel .settings-row{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 0;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        #settingsPanel .settings-row:first-of-type{ border-top: none; padding-top: 0; }
+        #settingsPanel .settings-label{ font-size: 13px; opacity: 0.95; }
+        #settingsPanel .settings-control{ display: flex; align-items: center; gap: 8px; }
+        #settingsPanel .settings-row-compact .settings-control{ font-size: 13px; opacity: 0.95; }
+
+        /* On very small screens keep the minimap slightly smaller */
+        @media (max-width: 360px){
+            #minimap{ width: 96px; height: 96px; }
+        }
+
+        #resourceBar{
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(10,10,10,0.95));
+            border: 2px solid #8b4513;
+            border-radius: 12px;
+            padding: 8px 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            justify-content: flex-start;
+            max-width: 100%;
+        }
+
+        .resource { display: flex; align-items: center; gap: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); position: relative; }
+        .resource-icon { width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .wood { background: linear-gradient(135deg, #8b4513, #654321); }
+        .stone { background: linear-gradient(135deg, #808080, #606060); }
+        .food { background: linear-gradient(135deg, #ffd700, #b8860b); }
+        .pop { background: linear-gradient(135deg, #4169e1, #27408b); }
+        .planks { background: linear-gradient(135deg, #deb887, #8b7355); }
+        .weapons { background: linear-gradient(135deg, #dc143c, #8b0000); }
+        .resource-bar { position: absolute; bottom: -4px; left: 0; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; width: 100%; overflow: hidden; }
+        .resource-fill { height: 100%; background: #4caf50; transition: width 0.3s, background 0.3s; }
+        .resource-fill.warning { background: #ff9800; }
+        .resource-fill.critical { background: #f44336; }
+        
+        #minimapContainer {
+            position: absolute; top: 10px; right: 10px; 
+            background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(10,10,10,0.95));
+            border: 2px solid #8b4513; border-radius: 10px; padding: 6px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+        #minimap { width: 120px; height: 120px; background: #1a1a1a; border: 1px solid #444; display: block; border-radius: 4px; }
+        
+        #buildMenuBtn {
+            position: absolute; bottom: 25px; right: 25px; width: 65px; height: 65px;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.95), rgba(101, 67, 33, 0.95));
+            border: 3px solid #d2691e; border-radius: 16px;
+            color: white; font-size: 30px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6), inset 0 2px 0 rgba(255,255,255,0.2);
+            transition: all 0.2s; z-index: 20;
+        }
+        #buildMenuBtn:active { transform: scale(0.92); }
+        #buildMenuBtn.active { background: linear-gradient(135deg, rgba(210, 105, 30, 0.95), rgba(180, 82, 20, 0.95)); border-color: #ff8c00; box-shadow: 0 0 20px rgba(255,140,0,0.4); }
+        
+        #buildMenu {
+            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(180deg, rgba(25,25,25,0.98), rgba(15,15,15,0.98));
+            border: 3px solid #8b4513; border-radius: 16px;
+            padding: 12px; display: none; grid-template-columns: repeat(4, 85px); gap: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+            max-height: 70vh; overflow-y: auto;
+        }
+        #buildMenu.active { display: grid; }
+        
+        .build-item {
+            background: linear-gradient(135deg, rgba(60, 40, 20, 0.8), rgba(40, 25, 10, 0.8));
+            border: 2px solid #8b4513; border-radius: 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; font-size: 10px; cursor: pointer; transition: all 0.2s; 
+            height: 90px; padding: 5px; text-align: center;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .build-item:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); border-color: #d2691e; }
+        .build-item.selected { background: linear-gradient(135deg, rgba(255, 140, 0, 0.9), rgba(200, 100, 0, 0.9)); border-color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
+        .build-item.disabled { opacity: 0.4; cursor: not-allowed; }
+        .build-icon { font-size: 24px; margin-bottom: 3px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .build-size { font-size: 9px; color: #aaa; margin-bottom: 2px; }
+        .build-cost { font-size: 9px; color: #ddd; line-height: 1.3; }
+        
+        #zoomControls { position: absolute; bottom: 25px; left: 25px; display: flex; flex-direction: column; gap: 12px; }
+        .zoomBtn { 
+            width: 55px; height: 55px; font-size: 28px; 
+            background: linear-gradient(135deg, rgba(30,30,30,0.95), rgba(20,20,30,0.95));
+            color: white; border: 2px solid #8b4513; border-radius: 12px; 
+            cursor: pointer; user-select: none; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: all 0.2s; pointer-events: auto;
+        }
+        .zoomBtn:active { transform: scale(0.92); background: rgba(80,60,40,0.9); }
+        
+        #info { 
+            position: absolute; top: 10px; left: 10px; 
+            color: #ddd; background: rgba(0,0,0,0.85); 
+            padding: 12px; border-radius: 8px; font-size: 11px; 
+            pointer-events: none; max-width: 240px; line-height: 1.6;
+            border: 1px solid #444;
+            display: none; /* mobile-first: hide */
+        }
+        
+        #buildStatus { 
+            position: absolute;
+            left: 50%;
+            bottom: 120px;
+            top: auto;
+            transform: translateX(-50%);
+            color: white;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(20,20,20,0.95));
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: bold;
+            display: none;
+            border: 2px solid #d2691e;
+            pointer-events: none;
+            text-align: center;
+            z-index: 15;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            max-width: 90vw;
+        }
+        #buildStatusText { text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        
+        #cancelBuildBtn { 
+            position: absolute; bottom: 100px; right: 25px; width: 55px; height: 55px; 
+            background: linear-gradient(135deg, rgba(211, 47, 47, 0.95), rgba(180, 30, 30, 0.95)); 
+            border: 3px solid #f44336; border-radius: 50%; 
+            color: white; font-size: 28px; cursor: pointer; 
+            display: none; align-items: center; justify-content: center; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 20; 
+            animation: pulse 1.5s infinite;
+        }
+        #cancelBuildBtn.active { display: flex; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); } 50% { transform: scale(1.05); box-shadow: 0 0 20px 10px rgba(244, 67, 54, 0); } }
+        
+        #militaryPanel {
+            position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+            background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(10,10,10,0.95));
+            border: 2px solid #8b0000; border-radius: 12px;
+            padding: 15px; display: none; flex-direction: column; gap: 10px;
+            color: white; font-size: 12px; max-width: 200px;
+        }
+        #militaryPanel.active { display: flex; }
+        .military-btn {
+            background: linear-gradient(135deg, #8b0000, #5c0000);
+            border: 2px solid #dc143c; border-radius: 8px;
+            padding: 10px; cursor: pointer; text-align: center;
+            transition: all 0.2s;
+        }
+        .military-btn:hover { background: linear-gradient(135deg, #a00000, #700000); transform: translateX(-3px); }
+        .military-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        #notification {
+            position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(139, 0, 0, 0.95), rgba(100, 0, 0, 0.95));
+            color: white; padding: 12px 30px; border-radius: 8px;
+            font-weight: bold; display: none; border: 2px solid #ff4444;
+            box-shadow: 0 6px 25px rgba(139, 0, 0, 0.5);
+            animation: slideDown 0.3s ease-out;
+            z-index: 100;
+        }
+        @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+        
+        #storageWarning {
+            position: absolute; bottom: 200px; left: 50%; transform: translateX(-50%);
+            color: #ff6b6b; font-weight: bold; font-size: 14px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9); display: none;
+            background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px;
+            border: 2px solid #ff4444;
+            z-index: 50;
+        }
+        
+        #storageDetails {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: linear-gradient(180deg, rgba(30,30,30,0.98), rgba(20,20,20,0.98));
+            border: 3px solid #8b4513; border-radius: 16px;
+            padding: 20px; display: none; flex-direction: column;
+            color: white; font-size: 14px; min-width: 300px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+            z-index: 30;
+            pointer-events: auto;
+        }
+        #storageDetails.active { display: flex; }
+        .storage-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #444; }
+        .storage-row:last-child { border-bottom: none; }
+        .close-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: #f44336; border: none; color: white;
+            width: 30px; height: 30px; border-radius: 50%;
+            cursor: pointer; font-size: 18px; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .speed-btn {
+            background: #8b4513; border: none; color: white;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer;
+            font-weight: bold;
+        }
+        .speed-btn.active { background: #d2691e; }
+    
+        /* Responsive HUD tuning */
+        /* Mobile-first defaults (<= 520px) */
+        #info { display: none !important; }              /* remove control help overlay */
+        #buildStatus { display: none !important; }       /* remove build popup */
+
+        @media (max-width: 520px) {
+            #topHUD { left: 10px; right: 10px; top: 10px; gap: 10px; }
+
+            /* Settings button (top-left) smaller */
+            #settingsBtn.hud-btn{
+                width: 44px; height: 44px;
+                border-radius: 12px;
+                font-size: 22px;
+            }
+
+            /* Resource bar much more compact */
+            #resourceBar{
+                padding: 6px 10px;
+                gap: 10px;
+                border-radius: 12px;
+                max-width: calc(100vw - 74px - 20px); /* leave room for settings btn */
+            }
+            .resource-item { gap: 8px; }
+            .resource-icon { width: 18px; height: 18px; font-size: 12px; border-radius: 4px; }
+            .resource-value { font-size: 13px; line-height: 1; }
+            .resource-bar { height: 3px; }
+
+            /* Hide secondary HUD items on very small screens */
+            .resource-item:nth-child(4),
+            .resource-item:nth-child(5) { display: none; } /* 📦 storage + ⚔️ soldiers */
+
+            /* Minimap smaller */
+            #minimapContainer { width: 110px; height: 110px; }
+            #minimap { width: 100%; height: 100%; }
+        }
+
+        /* Larger phones / tablets */
+        @media (min-width: 521px) and (max-width: 899px) {
+            #topHUD { left: 14px; right: 14px; top: 12px; gap: 12px; }
+            #resourceBar { padding: 8px 12px; gap: 12px; }
+            #minimapContainer { width: 120px; height: 120px; }
+        }
+
+        /* Desktop / large screens */
+        @media (min-width: 900px) {
+            #topHUD { left: 20px; right: 20px; top: 12px; }
+            #resourceBar{
+                flex-wrap: nowrap;
+                padding: 10px 14px;
+                gap: 14px;
+                max-width: 70vw;
+            }
+            #minimapContainer { width: 140px; height: 140px; }
+        }
+</style>
+<base target="_blank">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="uiLayer">
+
+        <div id="topHUD">
+            <button id="settingsBtn" class="ui-element hud-btn" aria-label="Einstellungen">⚙️</button>
+
+            <div id="resourceBar" class="ui-element">
+                <div class="resource-item">
+                    <div class="resource-icon">🪵</div>
+                    <div class="resource-info">
+                        <div class="resource-value" id="woodCount">400</div>
+                        <div class="resource-bar"><div class="resource-fill" id="woodFill"></div></div>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">🗿</div>
+                    <div class="resource-info">
+                        <div class="resource-value" id="stoneCount">0</div>
+                        <div class="resource-bar"><div class="resource-fill" id="stoneFill"></div></div>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">👥</div>
+                    <div class="resource-info">
+                        <div class="resource-value"><span id="popCount">5</span>/<span id="popMax">5</span></div>
+                        <div class="resource-bar"><div class="resource-fill" id="popFill"></div></div>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">📦</div>
+                    <div class="resource-info">
+                        <div class="resource-value" id="storageCount">0</div>
+                        <div class="resource-bar"><div class="resource-fill" id="storageFill"></div></div>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-icon">⚔️</div>
+                    <div class="resource-info">
+                        <div class="resource-value" id="soldierCount">0</div>
+                        <div class="resource-bar"><div class="resource-fill" id="soldierFill"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="minimapContainer" class="ui-element">
+                <canvas id="minimap" width="120" height="120"></canvas>
+            </div>
+
+            <div id="settingsPanel" class="ui-element" aria-hidden="true">
+                <div class="settings-title">Einstellungen</div>
+
+                <div class="settings-row">
+                    <div class="settings-label">⚡ Spielgeschwindigkeit</div>
+                    <div class="settings-control">
+                        <button class="speed-btn active" data-speed="1">1x</button>
+                        <button class="speed-btn" data-speed="2">2x</button>
+                        <button class="speed-btn" data-speed="3">3x</button>
+                    </div>
+                </div>
+                    <div class="settings-control"><span id="territorySize">400</span> Tiles</div>
+                </div>
+            </div>
+        </div>
+
+
+        
+        <div id="buildMenu" class="ui-element">
+            <div class="build-item" data-building="lumberjack" data-cost="wood:40,stone:10"><div class="build-icon">🪓</div><div class="build-size">2×2</div><div>Holzfäller</div><div class="build-cost">🪵40 🪨10</div></div>
+            <div class="build-item" data-building="stonemason" data-cost="wood:50,stone:0"><div class="build-icon">⛏️</div><div class="build-size">2×2</div><div>Steinmetz</div><div class="build-cost">🪵50</div></div>
+            <div class="build-item" data-building="farm" data-cost="wood:50,stone:20"><div class="build-icon">🌾</div><div class="build-size">2×2</div><div>Farm</div><div class="build-cost">🪵50 🪨20</div></div>
+            <div class="build-item" data-building="sawmill" data-cost="wood:80,stone:30"><div class="build-icon">🏭</div><div class="build-size">3×2</div><div>Sägewerk</div><div class="build-cost">🪵80 🪨30</div></div>
+            <div class="build-item" data-building="house" data-cost="wood:30,stone:20"><div class="build-icon">🏠</div><div class="build-size">2×2</div><div>Haus</div><div class="build-cost">🪵30 🪨20</div></div>
+            <div class="build-item" data-building="storage" data-cost="wood:100,stone:50"><div class="build-icon">📦</div><div class="build-size">3×3</div><div>Speicher</div><div class="build-cost">🪵100 🪨50</div></div>
+            <div class="build-item" data-building="barracks" data-cost="wood:150,stone:80"><div class="build-icon">⚔️</div><div class="build-size">3×3</div><div>Kaserne</div><div class="build-cost">🪵150 🪨80</div></div>
+            <div class="build-item" data-building="watchtower" data-cost="wood:200,stone:100"><div class="build-icon">🗼</div><div class="build-size">2×3</div><div>Wachturm</div><div class="build-cost">🪵200 🪨100</div></div>
+            <div class="build-item" data-building="weaponsmith" data-cost="wood:120,stone:80,planks:20"><div class="build-icon">🔨</div><div class="build-size">3×2</div><div>Schmiede</div><div class="build-cost">🪵120 🪨80 📦20</div></div>
+            <div class="build-item" data-building="mill" data-cost="wood:60,stone:40"><div class="build-icon">🌪️</div><div class="build-size">2×2</div><div>Mühle</div><div class="build-cost">🪵60 🪨40</div></div>
+            <div class="build-item" data-building="bakery" data-cost="wood:80,stone:60,planks:30"><div class="build-icon">🥖</div><div class="build-size">2×2</div><div>Bäckerei</div><div class="build-cost">🪵80 🪨60 📦30</div></div>
+        </div>
+        
+        <button id="buildMenuBtn" class="ui-element">🔨</button>
+        <button id="cancelBuildBtn" class="ui-element">✕</button>
+        
+        <div id="zoomControls">
+            <button class="zoomBtn" id="zoomIn">+</button>
+            <button class="zoomBtn" id="zoomOut">−</button>
+        </div>
+            <div style="font-size: 12px; margin-top: 8px; color: #aaa;">Tippen zum Bauen</div>
+        </div>
+        
+        <div id="militaryPanel" class="ui-element">
+            <div style="font-size: 14px; font-weight: bold; color: #dc143c; margin-bottom: 10px; text-align: center;">⚔️ REKRUTIERUNG</div>
+            <div class="military-btn" id="recruitSpear" onclick="game.tryRecruit('spear')">🛡️ Speerträger<br><small>1 Siedler + 1 Speer</small></div>
+            <div class="military-btn" id="recruitBow" onclick="game.tryRecruit('bow')">🏹 Bogenschütze<br><small>1 Siedler + 1 Bogen</small></div>
+        </div>
+        
+        <div id="notification"></div>
+        <div id="storageWarning">⚠️ LAGER FAST VOLL!</div>
+    </div>
+
+<script>
+const CONFIG = {
+    MAP_WIDTH: 120, MAP_HEIGHT: 90, TILE_SIZE: 32,
+    CAMERA: { minZoom: 0.3, maxZoom: 2.5, defaultZoom: 0.7 },
+    SPEED_BASE: 0.6,
+    GAME_SPEED: 0.6, START_TERRITORY_RADIUS: 15, WATCHTOWER_RADIUS: 15,
+    FOG_DARKNESS: 0.0, MAX_BARRACKS: 3,
+    STORAGE_LIMITS: { wood: 1000, stone: 600, food: 700, planks: 400, weapons: 100 },
+    WEAPON_COSTS: { spear: { wood: 2, planks: 0, food: 0 }, bow: { wood: 2, planks: 1, food: 1 } }
+};
+
+const BUILDINGS = {
+    hq: { name: 'HQ', color: '#8b0000', tileSize: 5, symbol: '🏰', workTile: { x: 2, y: 4 }, maxWorkers: 0 },
+    lumberjack: { name: 'Holzfäller', color: '#8b4513', tileSize: 3, symbol: '🪓', workTile: { x: 1, y: 2 }, cost: { wood: 40, stone: 10 }, buildTime: 300, maxWorkers: 2, produces: 'wood', workTime: 180 },
+    stonemason: { name: 'Steinmetz', color: '#696969', tileSize: 3, symbol: '⛏️', workTile: { x: 1, y: 2 }, cost: { wood: 50, stone: 0 }, buildTime: 300, maxWorkers: 2, produces: 'stone', workTime: 240 },
+    farm: { name: 'Farm', color: '#daa520', tileSize: 3, symbol: '🚜', workTile: { x: 1, y: 2 }, cost: { wood: 50, stone: 20 }, buildTime: 300, maxWorkers: 1, produces: 'grain', workTime: 200 },
+    sawmill: { name: 'Sägewerk', color: '#deb887', tileSize: 3, symbol: '🏭', workTile: { x: 1, y: 1 }, cost: { wood: 80, stone: 30 }, buildTime: 400, maxWorkers: 2, produces: 'planks', workTime: 150, input: { wood: 2 }, output: { planks: 1 } },
+    mill: { name: 'Mühle', color: '#f5deb3', tileSize: 2, symbol: '🌪️', workTile: { x: 1, y: 1 }, cost: { wood: 60, stone: 40 }, buildTime: 350, maxWorkers: 1, produces: 'flour', workTime: 180, input: { grain: 2 }, output: { flour: 1 } },
+    bakery: { name: 'Bäckerei', color: '#d2691e', tileSize: 2, symbol: '🥖', workTile: { x: 1, y: 1 }, cost: { wood: 80, stone: 60, planks: 30 }, buildTime: 400, maxWorkers: 1, produces: 'food', workTime: 200, input: { flour: 2 }, output: { food: 5 } },
+    weaponsmith: { name: 'Waffenschmiede', color: '#4a4a4a', tileSize: 3, symbol: '🔨', workTile: { x: 1, y: 1 }, cost: { wood: 120, stone: 80, planks: 20 }, buildTime: 500, maxWorkers: 2, produces: 'weapons', workTime: 300 },
+    house: { name: 'Haus', color: '#cd853f', tileSize: 2, symbol: '🏠', workTile: { x: 1, y: 1 }, cost: { wood: 30, stone: 20 }, buildTime: 200, maxWorkers: 0, spawnRate: 600 },
+    storage: { name: 'Speicher', color: '#8b7355', tileSize: 3, symbol: '📦', workTile: { x: 1, y: 1 }, cost: { wood: 100, stone: 50 }, buildTime: 400, maxWorkers: 0, storageBonus: { wood: 400, stone: 300, food: 300, planks: 200, weapons: 50 } },
+    barracks: { name: 'Kaserne', color: '#4a0000', tileSize: 3, symbol: '⚔️', workTile: { x: 1, y: 2 }, cost: { wood: 150, stone: 80 }, buildTime: 600, maxWorkers: 0 },
+    watchtower: { name: 'Wachturm', color: '#2f4f4f', tileSize: 2, symbol: '🗼', workTile: { x: 0, y: 2 }, cost: { wood: 200, stone: 100 }, buildTime: 500, maxWorkers: 0, requiresSoldiers: 2, territoryRadius: 15 }
+};
+
+
+// --- Sprite Assets (optional, fallback to vector render if not loaded) ---
+const ASSET_URLS = {
+    tree1: "https://raw.githubusercontent.com/emfau88/Siedler/d7ee5f6a4d3d3bcdd9f3cd0648f08500b788608d/baum1.png",
+    hq: "https://raw.githubusercontent.com/emfau88/Siedler/d7ee5f6a4d3d3bcdd9f3cd0648f08500b788608d/hq.png",
+    farm: "https://raw.githubusercontent.com/emfau88/Siedler/d7ee5f6a4d3d3bcdd9f3cd0648f08500b788608d/farm.png",
+    lumberjack: "https://raw.githubusercontent.com/emfau88/Siedler/d7ee5f6a4d3d3bcdd9f3cd0648f08500b788608d/holz.png",
+    stonemason: "https://raw.githubusercontent.com/emfau88/Siedler/d7ee5f6a4d3d3bcdd9f3cd0648f08500b788608d/stein.png"
+};
+
+// Per-building sprite tuning (in tile-width multiples)
+const SPRITE_META = {
+    // wTiles = Zielbreite in Tile-Einheiten (größer = sichtbarer)
+    // Ziel: visuell konsistent, ohne dass einzelne Gebäude "riesig" wirken.
+    hq:         { wTiles: 5.0, yPadTiles: 0.10 }, // HQ hat Base → leicht anheben
+    farm:       { wTiles: 4.0, yPadTiles: 0.06 },
+    lumberjack: { wTiles: 3.8, yPadTiles: 0.06 },
+    stonemason: { wTiles: 3.4, yPadTiles: 0.06 },
+    tree1:      { wTiles: 1.6, yPadTiles: 0.20 }
+};
+
+let spriteCache = {};
+let decorTrees = [];
+let canvas, ctx, minimapCanvas, minimapCtx;
+let camera = { x: 0, y: 0, zoom: CONFIG.CAMERA.defaultZoom };
+let map = [], buildings = [], trees = [], stoneDeposits = [], mountains = [];
+let gameTime = 0, isDragging = false, lastMouseX = 0, lastMouseY = 0, mousePos = { x: 0, y: 0 };
+let selectedBuilding = null, isBuildMode = false, selectedBarracks = null;
+let settlers = [], workers = [], soldiers = [], enemies = [], particles = [];
+let Resources = { wood: 400, stone: 200, food: 200, planks: 0, grain: 0, flour: 0, weapons: 0, pop: 5, popMax: 5 };
+let territoryCenters = [], fogMap = [];
+let storageLimits = { ...CONFIG.STORAGE_LIMITS };
+let updateAccumulator = 0;
+
+const game = {
+    init() {
+        canvas = document.getElementById('gameCanvas');
+        ctx = canvas.getContext('2d');
+        minimapCanvas = document.getElementById('minimap');
+        minimapCtx = minimapCanvas.getContext('2d');
+        
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.setupInput();
+        this.loadAssets();
+        this.generateMap();
+        this.placeHQ();
+        this.initTerritory();
+        this.bindUI();
+        this.updateResourceDisplay();
+        requestAnimationFrame(() => this.loop());
+    },
+
+    bindUI() {
+    // Build menu toggle
+    const buildBtn = document.getElementById('buildMenuBtn');
+    const buildMenu = document.getElementById('buildMenu');
+    const cancelBtn = document.getElementById('cancelBuildBtn');
+
+
+    // Settings (mobile-first HUD)
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    if (settingsBtn && settingsPanel) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsPanel.classList.toggle('open');
+            settingsPanel.setAttribute('aria-hidden', settingsPanel.classList.contains('open') ? 'false' : 'true');
+        });
+
+        // Close when tapping outside
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.classList.contains('open')) return;
+            const target = e.target;
+            if (settingsPanel.contains(target) || settingsBtn.contains(target)) return;
+            settingsPanel.classList.remove('open');
+            settingsPanel.setAttribute('aria-hidden', 'true');
+        });
+
+        // Speed buttons inside settings
+        settingsPanel.querySelectorAll('.speed-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const speed = parseInt(btn.dataset.speed || '1', 10);
+                this.setSpeed(speed, btn);
+            });
+        });
+    }
+
+    if (buildBtn && buildMenu) {
+        buildBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // If currently in build-mode, toggling menu should just show/hide menu (and not cancel build unless user presses X)
+            buildMenu.classList.toggle('active');
+            buildBtn.classList.toggle('active', buildMenu.classList.contains('active'));
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.exitBuildMode();
+            const bm = document.getElementById('buildMenu');
+            const bb = document.getElementById('buildMenuBtn');
+            if (bm) bm.classList.remove('active');
+            if (bb) bb.classList.remove('active');
+        });
+    }
+
+    // Build items
+    document.querySelectorAll('.build-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (item.classList.contains('disabled')) return;
+            const bt = item.dataset.building;
+            if (!bt || !BUILDINGS[bt]) return;
+            this.enterBuildMode(bt);
+        });
+    });
+
+    // Close menus when tapping outside (UI layer)
+    document.addEventListener('click', (e) => {
+        const bm = document.getElementById('buildMenu');
+        const bb = document.getElementById('buildMenuBtn');
+        if (!bm || !bb) return;
+        // if click is not on menu or button
+        if (!bm.contains(e.target) && e.target !== bb) {
+            bm.classList.remove('active');
+            bb.classList.remove('active');
+        }
+    });
+
+    // Zoom buttons
+    const zin = document.getElementById('zoomIn');
+    const zout = document.getElementById('zoomOut');
+    if (zin) zin.addEventListener('click', (e) => { e.stopPropagation(); this.zoom(1.15); });
+    if (zout) zout.addEventListener('click', (e) => { e.stopPropagation(); this.zoom(1/1.15); });
+
+    // Minimap recenters camera on tap
+    const mmc = document.getElementById('minimapContainer');
+    if (mmc) {
+        mmc.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.centerCameraOn(CONFIG.MAP_WIDTH / 2, CONFIG.MAP_HEIGHT / 2);
+        });
+    }
+    },
+    
+    setSpeed(speed, el) {
+        CONFIG.GAME_SPEED = CONFIG.SPEED_BASE * speed;
+        document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+        const t = el || (typeof event !== 'undefined' && event && event.target) ? event.target : null;
+        if (t && t.classList) t.classList.add('active');
+        this.showNotification(`⚡ Spielgeschwindigkeit: ${speed}x`);
+    },
+    
+    toggleStorageDetails() {
+        const panel = document.getElementById('storageDetails');
+        panel.classList.toggle('active');
+        if (panel.classList.contains('active')) {
+            this.updateStorageDetails();
+        }
+    },
+    
+    updateStorageDetails() {
+        const content = document.getElementById('storageContent');
+        content.innerHTML = '';
+        
+        const resources = [
+            { key: 'wood', name: '🪵 Holz', limit: storageLimits.wood },
+            { key: 'stone', name: '🪨 Stein', limit: storageLimits.stone },
+            { key: 'food', name: '🍞 Nahrung', limit: storageLimits.food },
+            { key: 'planks', name: '📦 Bretter', limit: storageLimits.planks },
+            { key: 'weapons', name: '⚔️ Waffen', limit: storageLimits.weapons },
+            { key: 'grain', name: '🌾 Getreide', limit: 9999 },
+            { key: 'flour', name: '🌪️ Mehl', limit: 9999 }
+        ];
+        
+        for (const res of resources) {
+            const current = Math.floor(Resources[res.key] || 0);
+            const percent = res.limit > 0 ? (current / res.limit * 100) : 0;
+            const color = percent > 90 ? '#f44336' : percent > 70 ? '#ff9800' : '#4caf50';
+            
+            const row = document.createElement('div');
+            row.className = 'storage-row';
+            row.innerHTML = `
+                <span>${res.name}</span>
+                <span style="color: ${color}">${current} / ${res.limit > 9000 ? '∞' : res.limit}</span>
+            `;
+            content.appendChild(row);
+        }
+    },
+    
+    resize() {
+        const dpr = window.devicePixelRatio || 1;
+        // Match the CSS size (100vw/100vh) and render at device pixel ratio for crispness.
+        const w = Math.floor(window.innerWidth * dpr);
+        const h = Math.floor(window.innerHeight * dpr);
+        canvas.width = w;
+        canvas.height = h;
+        // Use CSS pixels for all game math (camera, UI), so scale the context once.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    },
+
+    loadAssets() {
+        const load = (key, url) => {
+            const img = new Image();
+            img.onload = () => { spriteCache[key] = img; };
+            img.onerror = () => { /* ignore; keep fallback */ };
+            img.src = url;
+        };
+        for (const [k, url] of Object.entries(ASSET_URLS)) load(k, url);
+    },
+
+    drawSprite(key, screenCx, screenBottomY, wTiles, yPadTiles) {
+        const img = spriteCache[key];
+        if (!img || !img.complete || img.naturalWidth === 0) return false;
+        const ts = CONFIG.TILE_SIZE * camera.zoom;
+        const targetW = (wTiles * ts);
+        const scale = targetW / img.width;
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const yPad = (yPadTiles || 0) * ts;
+        ctx.drawImage(img, screenCx - w/2, (screenBottomY - h) - yPad, w, h);
+        return true;
+    },
+
+    drawBuildingSprite(b, def) {
+        const meta = SPRITE_META[b.type];
+        if (!meta) return false;
+        const screenCx = camera.x + (b.x + (def.tileSize * CONFIG.TILE_SIZE)/2) * camera.zoom;
+        const screenBottomY = camera.y + (b.y + (def.tileSize * CONFIG.TILE_SIZE)) * camera.zoom;
+        return this.drawSprite(b.type, screenCx, screenBottomY, meta.wTiles, meta.yPadTiles);
+    },
+    
+    generateMap() {
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            map[y] = [];
+            fogMap[y] = [];
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                map[y][x] = 0;
+                fogMap[y][x] = 0;
+            }
+        }
+        
+        mountains = [];
+        for (let m = 0; m < 8; m++) {
+            const mx = Math.floor(Math.random() * (CONFIG.MAP_WIDTH - 25)) + 12;
+            const my = Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - 25)) + 12;
+            const size = Math.floor(Math.random() * 15) + 8;
+            
+            for (let y = my - size; y <= my + size; y++) {
+                for (let x = mx - size; x <= mx + size; x++) {
+                    if (y >= 0 && y < CONFIG.MAP_HEIGHT && x >= 0 && x < CONFIG.MAP_WIDTH) {
+                        const dist = Math.sqrt((x-mx)**2 + (y-my)**2);
+                        if (dist <= size * (0.6 + Math.random() * 0.3)) {
+                            map[y][x] = 4;
+                            mountains.push({x, y, height: Math.max(0, size - dist)});
+                        }
+                    }
+                }
+            }
+        }
+        
+        for (let r = 0; r < 3; r++) {
+            let rx = Math.floor(Math.random() * (CONFIG.MAP_WIDTH - 50)) + 25;
+            let ry = 5;
+            while (ry < CONFIG.MAP_HEIGHT - 5) {
+                for (let w = -1; w <= 2; w++) {
+                    const wx = rx + w;
+                    if (wx >= 0 && wx < CONFIG.MAP_WIDTH && map[ry][wx] !== 4) {
+                        map[ry][wx] = 2;
+                    }
+                }
+                ry += Math.floor(Math.random() * 2) + 1;
+                rx += Math.floor(Math.random() * 5) - 2;
+            }
+        }
+        
+        for (let f = 0; f < 25; f++) {
+            let fx = Math.floor(Math.random() * (CONFIG.MAP_WIDTH - 30)) + 15;
+            let fy = Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - 30)) + 15;
+            if (map[fy][fx] !== 0) continue;
+            
+            const forestSize = Math.floor(Math.random() * 50) + 30;
+            const queue = [{x: fx, y: fy}];
+            let placed = 0;
+            const visited = new Set();
+            
+            while (queue.length > 0 && placed < forestSize) {
+                const current = queue.shift();
+                const key = `${current.x},${current.y}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+                
+                if (current.x < 0 || current.x >= CONFIG.MAP_WIDTH || 
+                    current.y < 0 || current.y >= CONFIG.MAP_HEIGHT) continue;
+                if (map[current.y][current.x] !== 0) continue;
+                
+                const distToCenter = Math.sqrt((current.x - fx)**2 + (current.y - fy)**2);
+                if (Math.random() < Math.max(0.3, 1 - distToCenter / 10)) {
+                    map[current.y][current.x] = 1;
+                    placed++;
+                    [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}].forEach(n => {
+                        if (!visited.has(`${current.x+n.x},${current.y+n.y}`)) {
+                            queue.push({x: current.x+n.x, y: current.y+n.y});
+                        }
+                    });
+                }
+            }
+        }
+        
+        stoneDeposits = [];
+        const centerX = Math.floor(CONFIG.MAP_WIDTH / 2);
+        const centerY = Math.floor(CONFIG.MAP_HEIGHT / 2);
+        
+        for (let s = 0; s < 15; s++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 20 + 8;
+            let sx = Math.floor(centerX + Math.cos(angle) * dist);
+            let sy = Math.floor(centerY + Math.sin(angle) * dist);
+            
+            sx = Math.max(2, Math.min(CONFIG.MAP_WIDTH - 5, sx));
+            sy = Math.max(2, Math.min(CONFIG.MAP_HEIGHT - 5, sy));
+            
+            if (map[sy][sx] !== 0) continue;
+            
+            const size = Math.random() < 0.5 ? 2 : 3;
+            let canPlace = true;
+            for (let dy = 0; dy < size; dy++) {
+                for (let dx = 0; dx < size; dx++) {
+                    if (map[sy+dy][sx+dx] !== 0) canPlace = false;
+                }
+            }
+            
+            if (canPlace) {
+                for (let dy = 0; dy < size; dy++) {
+                    for (let dx = 0; dx < size; dx++) {
+                        map[sy+dy][sx+dx] = 3;
+                    }
+                }
+                stoneDeposits.push({ x: sx, y: sy, size, infinite: true });
+            }
+        }
+        
+        trees = [];
+        decorTrees = [];
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                if (map[y][x] === 1) {
+                    trees.push({ x, y, age: Math.random() * 100, type: Math.floor(Math.random() * 3) });
+                    if (Math.random() < 0.20) {
+                        decorTrees.push({ x, y, k: 'tree1', variant: Math.floor(Math.random()*3) });
+                    }
+                }
+            }
+        }
+    },
+    
+    initTerritory() {
+        const hq = buildings.find(b => b.type === 'hq');
+        if (hq) {
+            const hqDef = BUILDINGS.hq; territoryCenters = [{ x: hq.tileX + hqDef.tileSize / 2, y: hq.tileY + hqDef.tileSize / 2, radius: CONFIG.START_TERRITORY_RADIUS }];
+            this.updateFog();
+        }
+    },
+    
+    updateFog() {
+        // No fog-of-war: everything always visible.
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                fogMap[y][x] = 0;
+            }
+        }
+    },
+    
+    isInTerritory(x, y) {
+        for (const center of territoryCenters) {
+            if (Math.sqrt((x - center.x)**2 + (y - center.y)**2) <= center.radius) return true;
+        }
+        return false;
+    },
+    
+    canBuildInFog(x, y, size) {
+        for (let dy = 0; dy < size; dy++) {
+            for (let dx = 0; dx < size; dx++) {
+                if (this.isInTerritory(x + dx + 0.5, y + dy + 0.5)) return true;
+            }
+        }
+        return false;
+    },
+    
+    placeHQ() {
+        const centerX = Math.floor(CONFIG.MAP_WIDTH / 2);
+        const centerY = Math.floor(CONFIG.MAP_HEIGHT / 2);
+        
+        for (let radius = 0; radius < 15; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    const x = centerX + dx, y = centerY + dy;
+                    if (this.canBuildAt(x, y, 'hq')) {
+                        this.addBuilding('hq', x, y);
+                        const hq = buildings[buildings.length - 1];
+                        const hqDef = BUILDINGS.hq;
+                        const spawnBaseX = hq.tileX + Math.floor(hqDef.tileSize / 2);
+                        const spawnBaseY = hq.tileY + hqDef.tileSize; // direkt "vor" dem HQ
+                        for (let i = 0; i < 5; i++) {
+                            settlers.push({
+                                id: 'settler_' + i,
+                                x: (spawnBaseX + (i % 3) - 1 + 0.5) * CONFIG.TILE_SIZE,
+                                y: (spawnBaseY + Math.floor(i / 3) + 0.5) * CONFIG.TILE_SIZE,
+                                homeX: (spawnBaseX + 0.5) * CONFIG.TILE_SIZE,
+                                homeY: (spawnBaseY + 0.5) * CONFIG.TILE_SIZE,
+                                state: 'idle', targetX: 0, targetY: 0,
+                                carrying: null, carryingAmount: 0, assignedSite: null,
+                                speed: 1.2, role: 'idle'
+                            });
+                        }
+                        this.centerCameraOn(hq.tileX + hqDef.tileSize / 2, hq.tileY + hqDef.tileSize / 2);
+                        return;
+                    }
+                }
+            }
+        }
+    },
+    
+    addBuilding(type, tileX, tileY) {
+        const def = BUILDINGS[type];
+        const b = {
+            type, tileX, tileY, x: tileX * CONFIG.TILE_SIZE, y: tileY * CONFIG.TILE_SIZE,
+            id: Date.now() + Math.random(), workX: tileX + def.workTile.x, workY: tileY + def.workTile.y,
+            constructionProgress: 0, maxConstructionProgress: def.buildTime || 100, isComplete: type === 'hq',
+            woodDelivered: 0, stoneDelivered: 0, planksDelivered: 0,
+            woodNeeded: def.cost ? (def.cost.wood || 0) : 0, 
+            stoneNeeded: def.cost ? (def.cost.stone || 0) : 0, 
+            planksNeeded: def.cost ? (def.cost.planks || 0) : 0,
+            workers: [], spawnTimer: 0, soldiers: 0, productionTimer: 0, inputStorage: {}, outputStorage: {}
+        };
+        buildings.push(b);
+        
+        if (type === 'watchtower' && b.isComplete) {
+            territoryCenters.push({ x: tileX + 1, y: tileY + 1.5, radius: CONFIG.WATCHTOWER_RADIUS });
+            this.updateFog();
+        }
+        
+        if (type === 'storage' && b.isComplete) {
+            for (const [res, amount] of Object.entries(BUILDINGS.storage.storageBonus)) {
+                storageLimits[res] += amount;
+            }
+        }
+        return b;
+    },
+    
+    canBuildAt(tileX, tileY, buildingType) {
+        const building = BUILDINGS[buildingType];
+        const size = building.tileSize;
+        
+        for (let dy = 0; dy < size; dy++) {
+            for (let dx = 0; dx < size; dx++) {
+                const checkX = tileX + dx, checkY = tileY + dy;
+                if (checkX < 0 || checkX >= CONFIG.MAP_WIDTH || checkY < 0 || checkY >= CONFIG.MAP_HEIGHT) return false;
+                if (map[checkY][checkX] === 2 || map[checkY][checkX] === 4) return false;
+                
+                for (const b of buildings) {
+                    const bType = BUILDINGS[b.type];
+                    if (checkX >= b.tileX && checkX < b.tileX + bType.tileSize &&
+                        checkY >= b.tileY && checkY < b.tileY + bType.tileSize) return false;
+                }
+            }
+        }
+        return true;
+    },
+    
+    startConstruction(tileX, tileY, buildingType) {
+        const def = BUILDINGS[buildingType];
+        const site = this.addBuilding(buildingType, tileX, tileY);
+        site.isComplete = false;
+        site.constructionProgress = 0;
+        site.entranceX = (tileX + def.tileSize / 2) * CONFIG.TILE_SIZE;
+        site.entranceY = (tileY + def.tileSize) * CONFIG.TILE_SIZE;
+        
+        let buildersAssigned = 0;
+        for (const s of settlers) {
+            if (s.state === 'idle' && buildersAssigned < 2) {
+                s.assignedSite = site.id;
+                s.state = 'moving_to_hq';
+                s.role = 'builder';
+                s.targetX = (buildings[0].workX + 0.5) * CONFIG.TILE_SIZE;
+                s.targetY = (buildings[0].workY + 0.5) * CONFIG.TILE_SIZE;
+                buildersAssigned++;
+            }
+        }
+        return site;
+    },
+    
+    checkStorageLimit(resource, amount) {
+        const limit = storageLimits[resource] || 9999;
+        const current = Resources[resource] || 0;
+        return current + amount <= limit;
+    },
+    
+    updateProduction() {
+        for (const b of buildings) {
+            if (!b.isComplete) continue;
+            const def = BUILDINGS[b.type];
+            
+            if (b.type === 'sawmill' && (b.inputStorage.wood || 0) >= 2 && this.checkStorageLimit('planks', 1)) {
+                b.productionTimer += CONFIG.GAME_SPEED;
+                if (b.productionTimer >= def.workTime) {
+                    b.productionTimer = 0;
+                    b.inputStorage.wood -= 2;
+                    Resources.planks += 1;
+                    this.updateResourceDisplay();
+                    this.createParticle(b.entranceX, b.entranceY, 'planks');
+                }
+            }
+            else if (b.type === 'mill' && (b.inputStorage.grain || 0) >= 2) {
+                b.productionTimer += CONFIG.GAME_SPEED;
+                if (b.productionTimer >= def.workTime) {
+                    b.productionTimer = 0;
+                    b.inputStorage.grain -= 2;
+                    b.outputStorage.flour = (b.outputStorage.flour || 0) + 1;
+                }
+            }
+            else if (b.type === 'bakery' && (b.inputStorage.flour || 0) >= 2 && this.checkStorageLimit('food', 5)) {
+                b.productionTimer += CONFIG.GAME_SPEED;
+                if (b.productionTimer >= def.workTime) {
+                    b.productionTimer = 0;
+                    b.inputStorage.flour -= 2;
+                    Resources.food += 5;
+                    this.updateResourceDisplay();
+                    this.createParticle(b.entranceX, b.entranceY, 'food');
+                }
+            }
+            else if (b.type === 'weaponsmith') {
+                const canMakeSpear = Resources.wood >= 2 && this.checkStorageLimit('weapons', 1);
+                const canMakeBow = Resources.wood >= 2 && Resources.planks >= 1 && Resources.food >= 1 && this.checkStorageLimit('weapons', 1);
+                
+                if (canMakeBow || canMakeSpear) {
+                    b.productionTimer += CONFIG.GAME_SPEED;
+                    if (b.productionTimer >= def.workTime) {
+                        b.productionTimer = 0;
+                        if (canMakeBow) {
+                            Resources.wood -= 2; Resources.planks -= 1; Resources.food -= 1;
+                            b.outputStorage.bows = (b.outputStorage.bows || 0) + 1;
+                        } else {
+                            Resources.wood -= 2;
+                            b.outputStorage.spears = (b.outputStorage.spears || 0) + 1;
+                        }
+                        Resources.weapons++;
+                        this.updateResourceDisplay();
+                        this.createParticle(b.entranceX, b.entranceY, 'weapon');
+                    }
+                }
+            }
+        }
+    },
+    
+    updateCarriers() {
+        // Build a fresh job queue each tick (cheap enough for this scale)
+        const jobs = this.buildCarrierJobs();
+
+        // Assign as many jobs as we have idle settlers
+        let jobIndex = 0;
+        for (const s of settlers) {
+            if (jobIndex >= jobs.length) break;
+            if (s.state === 'idle' && s.role === 'idle') {
+                const job = jobs[jobIndex++];
+                s.role = 'carrier';
+                s.carrierJob = job;
+                s.state = 'carrier_fetch';
+                s.targetX = job.fromX;
+                s.targetY = job.fromY;
+            }
+        }
+
+        // Execute carrier state machine
+        for (const s of settlers) {
+            if (s.role !== 'carrier') continue;
+
+            switch (s.state) {
+                case 'carrier_fetch':
+                    this.moveEntity(s);
+                    if (this.isAtTarget(s)) {
+                        const job = s.carrierJob;
+
+                        // Take resources from HQ/global storage at fetch time
+                        const available = Resources[job.resource] || 0;
+                        if (available < job.amount) {
+                            s.state = 'idle'; s.role = 'idle'; s.carrierJob = null;
+                            break;
+                        }
+                        Resources[job.resource] -= job.amount;
+                        s.carrying = job.resource;
+                        s.carryingAmount = job.amount;
+
+                        s.state = 'carrier_deliver';
+                        s.targetX = job.toX;
+                        s.targetY = job.toY;
+                        this.updateResourceDisplay();
+                    }
+                    break;
+
+                case 'carrier_deliver':
+                    this.moveEntity(s);
+                    if (this.isAtTarget(s)) {
+                        const job = s.carrierJob;
+
+                        if (job.type === 'to_building') {
+                            const site = buildings.find(b => b.id === job.toBuilding);
+                            if (site) {
+                                if (s.carrying === 'wood') site.woodDelivered += s.carryingAmount;
+                                else if (s.carrying === 'stone') site.stoneDelivered += s.carryingAmount;
+                                else if (s.carrying === 'planks') site.planksDelivered += s.carryingAmount;
+                            }
+                        } else if (job.type === 'production_input') {
+                            const building = buildings.find(b => b.id === job.toBuilding);
+                            if (building) {
+                                building.inputStorage[s.carrying] = (building.inputStorage[s.carrying] || 0) + s.carryingAmount;
+                            }
+                        } else if (job.type === 'collect_output') {
+                            const building = buildings.find(b => b.id === job.fromBuilding);
+                            if (building) {
+                                // Move from building.outputStorage to global Resources
+                                const out = building.outputStorage[s.carrying] || 0;
+                                const take = Math.min(out, s.carryingAmount);
+                                building.outputStorage[s.carrying] = out - take;
+                                Resources[s.carrying] = (Resources[s.carrying] || 0) + take;
+                            }
+                            this.updateResourceDisplay();
+                        }
+
+                        s.carrying = null;
+                        s.carryingAmount = 0;
+                        s.state = 'returning_home';
+                        s.targetX = s.homeX;
+                        s.targetY = s.homeY;
+                    }
+                    break;
+
+                case 'returning_home':
+                    this.moveEntity(s);
+                    if (this.isAtTarget(s)) {
+                        s.state = 'idle';
+                        s.role = 'idle';
+                        s.carrierJob = null;
+                    }
+                    break;
+            }
+        }
+    },
+
+    buildCarrierJobs() {
+        const jobs = [];
+        const hq = buildings.find(b => b.type === 'hq');
+        if (!hq) return jobs;
+
+        const fromX = (hq.workX + 0.5) * CONFIG.TILE_SIZE;
+        const fromY = (hq.workY + 0.5) * CONFIG.TILE_SIZE;
+
+        // 1) Baustellen beliefern (Priorität)
+        for (const site of buildings) {
+            if (site.isComplete) continue;
+
+            // Planks first (rare)
+            const plNeed = (site.planksNeeded || 0) - (site.planksDelivered || 0);
+            if (plNeed > 0 && (Resources.planks || 0) > 0) {
+                const amt = Math.min(5, plNeed, Resources.planks);
+                jobs.push({ type: 'to_building', resource: 'planks', amount: amt, fromX, fromY, toX: site.entranceX, toY: site.entranceY, toBuilding: site.id });
+            }
+
+            const wNeed = (site.woodNeeded || 0) - (site.woodDelivered || 0);
+            if (wNeed > 0 && (Resources.wood || 0) > 0) {
+                const amt = Math.min(10, wNeed, Resources.wood);
+                jobs.push({ type: 'to_building', resource: 'wood', amount: amt, fromX, fromY, toX: site.entranceX, toY: site.entranceY, toBuilding: site.id });
+            }
+
+            const sNeed = (site.stoneNeeded || 0) - (site.stoneDelivered || 0);
+            if (sNeed > 0 && (Resources.stone || 0) > 0) {
+                const amt = Math.min(10, sNeed, Resources.stone);
+                jobs.push({ type: 'to_building', resource: 'stone', amount: amt, fromX, fromY, toX: site.entranceX, toY: site.entranceY, toBuilding: site.id });
+            }
+        }
+
+        // 2) Produktions-Inputs füllen
+        for (const b of buildings) {
+            if (!b.isComplete) continue;
+
+            if (b.type === 'sawmill') {
+                const cur = b.inputStorage.wood || 0;
+                if (cur < 30 && (Resources.wood || 0) >= 5) {
+                    jobs.push({ type: 'production_input', resource: 'wood', amount: 5, fromX, fromY, toX: b.entranceX, toY: b.entranceY, toBuilding: b.id });
+                }
+            }
+
+            if (b.type === 'mill') {
+                const cur = b.inputStorage.grain || 0;
+                if (cur < 20 && (Resources.grain || 0) >= 5) {
+                    jobs.push({ type: 'production_input', resource: 'grain', amount: 5, fromX, fromY, toX: b.entranceX, toY: b.entranceY, toBuilding: b.id });
+                }
+            }
+
+            if (b.type === 'bakery') {
+                const cur = b.inputStorage.flour || 0;
+                if (cur < 20 && (Resources.flour || 0) >= 2) {
+                    jobs.push({ type: 'production_input', resource: 'flour', amount: 2, fromX, fromY, toX: b.entranceX, toY: b.entranceY, toBuilding: b.id });
+                }
+            }
+        }
+
+        // 3) Farm/Mill Output einsammeln → global (optional, damit Ketten laufen)
+        for (const b of buildings) {
+            if (!b.isComplete) continue;
+            if (b.type === 'farm') {
+                const out = b.outputStorage.grain || 0;
+                if (out >= 5 && this.checkStorageLimit('grain', 5)) {
+                    jobs.push({ type: 'collect_output', resource: 'grain', amount: 5, fromX: b.entranceX, fromY: b.entranceY, toX: fromX, toY: fromY, fromBuilding: b.id });
+                }
+            }
+            if (b.type === 'mill') {
+                const out = b.outputStorage.flour || 0;
+                if (out >= 2 && this.checkStorageLimit('flour', 2)) {
+                    jobs.push({ type: 'collect_output', resource: 'flour', amount: 2, fromX: b.entranceX, fromY: b.entranceY, toX: fromX, toY: fromY, fromBuilding: b.id });
+                }
+            }
+        }
+
+        // Baustellen-Jobs vor Produktions-Jobs
+        jobs.sort((a, b) => {
+            const pa = (a.type === 'to_building') ? 0 : 1;
+            const pb = (b.type === 'to_building') ? 0 : 1;
+            return pa - pb;
+        });
+
+        return jobs;
+    },
+
+    updateWorkers() {
+        for (const w of workers) {
+            const building = buildings.find(b => b.id === w.buildingId);
+            if (!building || !building.isComplete) continue;
+            
+            const def = BUILDINGS[building.type];
+            const workX = (building.workX + 0.5) * CONFIG.TILE_SIZE;
+            const workY = (building.workY + 0.5) * CONFIG.TILE_SIZE;
+            
+            switch(w.state) {
+                case 'in_building':
+                    w.x = workX; w.y = workY;
+                    
+                    if (building.type === 'lumberjack') {
+                        const tree = this.findNearestTree(building.workX, building.workY, 30) || this.findNearestTree(building.workX, building.workY, null);
+                        if (tree) {
+                            w.targetX = (tree.x + 0.5) * CONFIG.TILE_SIZE;
+                            w.targetY = (tree.y + 0.5) * CONFIG.TILE_SIZE;
+                            w.targetTree = tree;
+                            w.state = 'walking_to_work';
+                        }
+                    } else if (building.type === 'stonemason') {
+                        const stone = this.findNearestStone(building.workX, building.workY, 15);
+                        if (stone) {
+                            w.targetX = (stone.x + Math.random() * stone.size) * CONFIG.TILE_SIZE;
+                            w.targetY = (stone.y + Math.random() * stone.size) * CONFIG.TILE_SIZE;
+                            w.targetStone = stone;
+                            w.state = 'walking_to_work';
+                        }
+                    } else if (building.type === 'farm' && this.checkStorageLimit('grain', 2)) {
+                        w.workTimer += CONFIG.GAME_SPEED;
+                        if (w.workTimer >= def.workTime) {
+                            w.workTimer = 0;
+                            building.outputStorage.grain = (building.outputStorage.grain || 0) + 2;
+                            this.createParticle(workX, workY, 'grain');
+                        }
+                    }
+                    break;
+                    
+                case 'walking_to_work':
+                    this.moveEntity(w);
+                    if (this.isAtTarget(w)) {
+                        w.state = 'working';
+                        w.workTimer = 0;
+                    }
+                    break;
+                    
+                case 'working':
+                    w.workTimer += CONFIG.GAME_SPEED;
+                    if (gameTime % 20 === 0) this.createParticle(w.x, w.y - 10, 'work');
+                    
+                    if (w.workTimer >= (def.workTime || 120)) {
+                        if (building.type === 'lumberjack' && w.targetTree) {
+                            this.removeTree(w.targetTree.x, w.targetTree.y);
+                            w.carrying = 'wood'; w.carryingAmount = 10;
+                        } else if (building.type === 'stonemason' && w.targetStone) {
+                            w.carrying = 'stone'; w.carryingAmount = 8;
+                        }
+                        w.state = 'returning';
+                        w.targetX = workX;
+                        w.targetY = workY;
+                    }
+                    break;
+                    
+                case 'returning':
+                    this.moveEntity(w);
+                    if (this.isAtTarget(w)) {
+                        if (w.carrying === 'wood' && this.checkStorageLimit('wood', w.carryingAmount)) {
+                            Resources.wood += w.carryingAmount;
+                        } else if (w.carrying === 'stone' && this.checkStorageLimit('stone', w.carryingAmount)) {
+                            Resources.stone += w.carryingAmount;
+                        }
+                        if (w.carrying) {
+                            this.updateResourceDisplay();
+                            this.createParticle(w.x, w.y, w.carrying);
+                        }
+                        w.carrying = null; w.carryingAmount = 0;
+                        w.targetTree = null; w.targetStone = null;
+                        w.state = 'in_building';
+                    }
+                    break;
+            }
+        }
+    },
+    
+    findNearestTree(fromX, fromY, maxDist) {
+        let nearest = null, minDist = Infinity;
+        for (const tree of trees) {
+            const dist = Math.sqrt((tree.x - fromX)**2 + (tree.y - fromY)**2);
+            if (dist < minDist && (maxDist == null || dist <= maxDist)) { minDist = dist; nearest = tree; }
+        }
+        return nearest;
+    },
+    
+    findNearestStone(fromX, fromY, maxDist) {
+        let nearest = null, minDist = Infinity;
+        for (const stone of stoneDeposits) {
+            const centerX = stone.x + stone.size / 2;
+            const centerY = stone.y + stone.size / 2;
+            const dist = Math.sqrt((centerX - fromX)**2 + (centerY - fromY)**2);
+            if (dist < minDist && (maxDist == null || dist <= maxDist)) { minDist = dist; nearest = stone; }
+        }
+        return nearest;
+    },
+    
+    removeTree(x, y) {
+        this.createParticle((x + 0.5) * CONFIG.TILE_SIZE, (y + 0.5) * CONFIG.TILE_SIZE, 'wood');
+        trees = trees.filter(t => !(t.x === x && t.y === y));
+        map[y][x] = 0;
+    },
+    
+    updateEnemies() {
+        if (gameTime % 600 === 0 && enemies.length < 10) this.spawnEnemy();
+        
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            let target = this.findNearestSettlerOrBuilding(e.x, e.y);
+            
+            if (target) {
+                const dx = target.x - e.x;
+                const dy = target.y - e.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist > 5) {
+                    e.x += (dx / dist) * e.speed;
+                    e.y += (dy / dist) * e.speed;
+                } else if (gameTime % 60 === 0 && target.type === 'settler') {
+                    const s = settlers.find(settler => settler.id === target.id);
+                    if (s) {
+                        this.showNotification(`⚠️ ${e.name} greift Siedler an!`);
+                        s.state = 'fleeing';
+                        s.targetX = s.homeX;
+                        s.targetY = s.homeY;
+                    }
+                }
+            }
+            
+            for (const soldier of soldiers) {
+                const sdx = soldier.x - e.x;
+                const sdy = soldier.y - e.y;
+                const sDist = Math.sqrt(sdx*sdx + sdy*sdy);
+                
+                if (sDist < (soldier.weapon === 'bow' ? 150 : 30) && gameTime % 30 === 0) {
+                    e.hp -= soldier.damage;
+                    this.createParticle(e.x, e.y, 'blood');
+                    if (e.hp <= 0) {
+                        enemies.splice(i, 1);
+                        this.showNotification(`💀 ${e.name} besiegt!`);
+                        break;
+                    }
+                }
+            }
+        }
+    },
+    
+    spawnEnemy() {
+        let attempts = 0;
+        while (attempts < 50) {
+            const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
+            const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
+            
+            if (fogMap[y][x] === 1 && map[y][x] !== 2 && map[y][x] !== 4) {
+                const isWolf = Math.random() > 0.5;
+                enemies.push({
+                    x: (x + 0.5) * CONFIG.TILE_SIZE, y: (y + 0.5) * CONFIG.TILE_SIZE,
+                    type: isWolf ? 'wolf' : 'bear', name: isWolf ? 'Wolf' : 'Bär',
+                    hp: isWolf ? 30 : 60, speed: isWolf ? 0.8 : 0.5, damage: isWolf ? 5 : 10
+                });
+                break;
+            }
+            attempts++;
+        }
+    },
+    
+    findNearestSettlerOrBuilding(ex, ey) {
+        let nearest = null, minDist = Infinity;
+        
+        for (const s of settlers) {
+            const dist = Math.sqrt((s.x - ex)**2 + (s.y - ey)**2);
+            if (dist < minDist && dist < 300) { minDist = dist; nearest = { x: s.x, y: s.y, type: 'settler', id: s.id }; }
+        }
+        
+        for (const b of buildings) {
+            if (b.type === 'hq') continue;
+            const bx = b.x + BUILDINGS[b.type].tileSize * CONFIG.TILE_SIZE / 2;
+            const by = b.y + BUILDINGS[b.type].tileSize * CONFIG.TILE_SIZE / 2;
+            const dist = Math.sqrt((bx - ex)**2 + (by - ey)**2);
+            if (dist < minDist && dist < 300) { minDist = dist; nearest = { x: bx, y: by, type: 'building' }; }
+        }
+        return nearest;
+    },
+    
+    tryRecruit(weaponType) {
+        if (!selectedBarracks) { this.showNotification('❌ Keine Kaserne ausgewählt!'); return; }
+        if (Resources.weapons < 1) { this.showNotification('❌ Keine Waffen verfügbar!'); return; }
+        
+        const settler = settlers.find(s => s.state === 'idle');
+        if (!settler) { this.showNotification('❌ Keine freien Siedler!'); return; }
+        
+        const b = selectedBarracks;
+        soldiers.push({
+            x: (b.workX + 0.5) * CONFIG.TILE_SIZE, y: (b.workY + 0.5) * CONFIG.TILE_SIZE,
+            weapon: weaponType, damage: weaponType === 'bow' ? 8 : 12,
+            patrolCenter: { x: b.workX + 0.5, y: b.workY + 0.5 }, patrolRadius: 8,
+            targetX: (b.workX + 0.5) * CONFIG.TILE_SIZE, targetY: (b.workY + 0.5) * CONFIG.TILE_SIZE,
+            speed: weaponType === 'bow' ? 0.9 : 1.0
+        });
+        
+        Resources.weapons--; Resources.pop--;
+        settlers = settlers.filter(s => s !== settler);
+        this.updateResourceDisplay();
+        this.showNotification(`⚔️ Neuer ${weaponType === 'bow' ? 'Bogenschütze' : 'Speerträger'} rekrutiert!`);
+    },
+    
+    updateSoldiers() {
+        for (const s of soldiers) {
+            const dx = s.targetX - s.x;
+            const dy = s.targetY - s.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < s.speed) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * s.patrolRadius * CONFIG.TILE_SIZE;
+                s.targetX = (s.patrolCenter.x * CONFIG.TILE_SIZE) + Math.cos(angle) * radius;
+                s.targetY = (s.patrolCenter.y * CONFIG.TILE_SIZE) + Math.sin(angle) * radius;
+            } else {
+                s.x += (dx / dist) * s.speed;
+                s.y += (dy / dist) * s.speed;
+            }
+        }
+    },
+    
+    updateHouses() {
+        for (const house of buildings.filter(b => b.type === 'house' && b.isComplete)) {
+            if (Resources.pop < Resources.popMax) {
+                house.spawnTimer += CONFIG.GAME_SPEED;
+                if (house.spawnTimer >= BUILDINGS.house.spawnRate) {
+                    house.spawnTimer = 0;
+                    Resources.pop++;
+                    const newSettler = {
+                        id: 'settler_' + Date.now(),
+                        x: (house.workX + 0.5) * CONFIG.TILE_SIZE, y: (house.workY + 0.5) * CONFIG.TILE_SIZE,
+                        homeX: (house.workX + 0.5) * CONFIG.TILE_SIZE, homeY: (house.workY + 0.5) * CONFIG.TILE_SIZE,
+                        state: 'idle', targetX: 0, targetY: 0, carrying: null, carryingAmount: 0, assignedSite: null, speed: 1.2, role: 'idle'
+                    };
+                    settlers.push(newSettler);
+                    this.updateResourceDisplay();
+                    for (let i = 0; i < 5; i++) this.createParticle(newSettler.x, newSettler.y, 'pop');
+                }
+            }
+        }
+    },
+    
+    update() {
+        updateAccumulator += CONFIG.GAME_SPEED;
+        while (updateAccumulator >= 1) {
+            updateAccumulator -= 1;
+            gameTime++;
+            this.updateConstruction();
+            this.updateCarriers();
+            this.updateWorkers();
+            this.updateProduction();
+            this.updateHouses();
+            this.updateSoldiers();
+            this.updateEnemies();
+            this.updateParticles();
+            this.regrowTrees();
+            this.checkStorageWarning();
+        }
+    },
+    
+    updateConstruction() {
+        for (const site of buildings) {
+            if (site.isComplete) continue;
+            
+            const materialsComplete = site.woodDelivered >= site.woodNeeded && site.stoneDelivered >= site.stoneNeeded && site.planksDelivered >= site.planksNeeded;
+            
+            if (materialsComplete) {
+                site.constructionProgress += CONFIG.GAME_SPEED * (1 + (site.builders || 0));
+                if (gameTime % 30 === 0) this.createParticle(site.entranceX, site.entranceY - 20, 'smoke');
+                
+                if (site.constructionProgress >= site.maxConstructionProgress) {
+                    site.isComplete = true;
+                    const def = BUILDINGS[site.type];
+                    
+                    if (def.maxWorkers > 0) {
+                        for (let i = 0; i < def.maxWorkers; i++) {
+                            workers.push({ id: 'worker_' + site.id + '_' + i, buildingId: site.id, x: (site.workX + 0.5) * CONFIG.TILE_SIZE, y: (site.workY + 0.5) * CONFIG.TILE_SIZE, state: 'in_building', targetX: 0, targetY: 0, carrying: null, workTimer: 0, speed: 1.0 });
+                        }
+                    }
+                    
+                    if (site.type === 'watchtower') {
+                        territoryCenters.push({ x: site.tileX + 1, y: site.tileY + 1.5, radius: CONFIG.WATCHTOWER_RADIUS });
+                        this.updateFog();
+                        this.showNotification('🏰 Territorium erweitert!');
+                    }
+                    
+                    if (site.type === 'storage') {
+                        for (const [res, amount] of Object.entries(BUILDINGS.storage.storageBonus)) {
+                            storageLimits[res] += amount;
+                        }
+                    }
+                    
+                    for (let i = 0; i < 10; i++) {
+                        setTimeout(() => this.createParticle(site.x + CONFIG.TILE_SIZE, site.y + CONFIG.TILE_SIZE, 'wood'), i * 50);
+                    }
+                }
+            }
+        }
+    },
+    
+    regrowTrees() {
+        if (gameTime % 400 !== 0) return;
+        const candidates = [];
+        for (let y = 1; y < CONFIG.MAP_HEIGHT - 1; y++) {
+            for (let x = 1; x < CONFIG.MAP_WIDTH - 1; x++) {
+                if (map[y][x] === 0) {
+                    const neighbors = [map[y-1][x], map[y+1][x], map[y][x-1], map[y][x+1]];
+                    if (neighbors.some(n => n === 1)) candidates.push({x, y});
+                }
+            }
+        }
+        const count = Math.min(candidates.length, 5);
+        for (let i = 0; i < count; i++) {
+            if (candidates.length === 0) break;
+            const idx = Math.floor(Math.random() * candidates.length);
+            const pos = candidates.splice(idx, 1)[0];
+            map[pos.y][pos.x] = 1;
+            trees.push({x: pos.x, y: pos.y, age: 0, type: Math.floor(Math.random() * 3)});
+        }
+    },
+    
+    checkStorageWarning() {
+        const warning = document.getElementById('storageWarning');
+        let almostFull = false;
+        let full = false;
+        for (const [res, limit] of Object.entries(storageLimits)) {
+            const current = Resources[res] || 0;
+            if (current >= limit * 0.98) full = true;
+            else if (current >= limit * 0.90) almostFull = true;
+        }
+        
+        if (full) {
+            warning.textContent = '⚠️ LAGER VOLL!';
+            warning.style.display = 'block';
+            warning.style.borderColor = '#f44336';
+            warning.style.color = '#f44336';
+        } else if (almostFull) {
+            warning.textContent = '⚠️ Lager fast voll';
+            warning.style.display = 'block';
+            warning.style.borderColor = '#ff9800';
+            warning.style.color = '#ff9800';
+        } else {
+            warning.style.display = 'none';
+        }
+    },
+    
+    moveEntity(e) {
+        const dx = e.targetX - e.x;
+        const dy = e.targetY - e.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > e.speed) {
+            e.x += (dx / dist) * e.speed;
+            e.y += (dy / dist) * e.speed;
+        } else {
+            e.x = e.targetX;
+            e.y = e.targetY;
+        }
+    },
+    
+    isAtTarget(e) {
+        const dx = e.targetX - e.x;
+        const dy = e.targetY - e.y;
+        return Math.sqrt(dx*dx + dy*dy) < 5;
+    },
+    
+    createParticle(x, y, type) {
+        const colors = { wood: '#8b4513', stone: '#9e9e9e', food: '#ffd700', planks: '#deb887', grain: '#f0e68c', flour: '#fff8dc', weapon: '#dc143c', smoke: 'rgba(100,100,100,0.5)', work: '#ffeb3b', pop: '#4caf50', blood: '#ff0000' };
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 3 - 1, life: 50, type, color: colors[type] || '#fff', size: Math.random() * 4 + 2 });
+    },
+    
+    updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.15;
+            p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    },
+    
+    showNotification(text) {
+        const el = document.getElementById('notification');
+        el.textContent = text;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 3000);
+    },
+    
+    setupInput() {
+        // Pointer Events (robust on mobile + desktop): prevents "stuck dragging"
+        // We exclusively use pointer* to avoid mouse+touch double-firing.
+        canvas.style.touchAction = 'none';
+
+        this._activePointerId = null;
+
+        const end = () => {
+            this._activePointerId = null;
+            this.onPointerUp();
+        };
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (!e.isPrimary) return;
+
+            // If user taps UI, it should not start a drag on the canvas.
+            // (UI is above canvas but safety check: if any element captured pointer, ignore.)
+            if (e.target !== canvas) return;
+
+            this._activePointerId = e.pointerId;
+            try { canvas.setPointerCapture(e.pointerId); } catch {}
+
+            e.preventDefault();
+            this.onPointerDown(e.clientX, e.clientY);
+        }, { passive: false });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (this._activePointerId !== e.pointerId) return;
+            e.preventDefault();
+            this.onPointerMove(e.clientX, e.clientY);
+        }, { passive: false });
+
+        canvas.addEventListener('pointerup', (e) => {
+            if (this._activePointerId !== e.pointerId) return;
+            e.preventDefault();
+            try { canvas.releasePointerCapture(e.pointerId); } catch {}
+            end();
+        }, { passive: false });
+
+        canvas.addEventListener('pointercancel', (e) => {
+            if (this._activePointerId !== e.pointerId) return;
+            try { canvas.releasePointerCapture(e.pointerId); } catch {}
+            end();
+        });
+
+
+        // Mouse-wheel zoom (desktop)
+        canvas.addEventListener('wheel', (e) => {
+            // Allow wheel zoom without scrolling the page
+            e.preventDefault();
+            const factor = e.deltaY < 0 ? 1.10 : 1 / 1.10;
+            this.zoom(factor, e.clientX, e.clientY);
+        }, { passive: false });
+
+        // Hard-stop: if focus is lost, never keep dragging
+        window.addEventListener('blur', end);
+    },
+    
+    onPointerDown(x, y) {
+        mousePos.x = x; mousePos.y = y;
+
+        // Build-Mode: Tap = build attempt
+        if (isBuildMode) {
+            const t = this.screenToTile(x, y);
+            this.tryBuild(t.x, t.y);
+            isDragging = false;
+            return;
+        }
+
+        // Start potential drag; treat as click unless moved enough
+        this._pointerDownX = x;
+        this._pointerDownY = y;
+        this._didDrag = false;
+
+        lastMouseX = x;
+        lastMouseY = y;
+        isDragging = false;
+        canvas.style.cursor = 'grabbing';
+    },
+    
+    onPointerMove(x, y) {
+        mousePos.x = x; mousePos.y = y;
+
+        const dx = x - lastMouseX;
+        const dy = y - lastMouseY;
+
+        // If movement exceeds threshold → drag camera
+        const totalDx = x - (this._pointerDownX ?? x);
+        const totalDy = y - (this._pointerDownY ?? y);
+        if (!this._didDrag && (Math.abs(totalDx) > 6 || Math.abs(totalDy) > 6)) {
+            this._didDrag = true;
+            isDragging = true;
+        }
+
+        if (isDragging) {
+            camera.x += dx;
+            camera.y += dy;
+        }
+
+        lastMouseX = x;
+        lastMouseY = y;
+    },
+    
+    onPointerUp() {
+        canvas.style.cursor = 'default';
+
+        // If no drag happened → treat as click/tap on world
+        if (!this._didDrag && !isBuildMode) {
+            const t = this.screenToTile(mousePos.x, mousePos.y);
+
+            // Building hit-test
+            const hit = this.getBuildingAtTile(t.x, t.y);
+            if (hit) {
+                // Barracks selection keeps military panel logic
+                if (hit.type === 'barracks' && hit.isComplete) {
+                    selectedBarracks = hit;
+                    document.getElementById('militaryPanel').classList.add('active');
+                } else {
+                    document.getElementById('militaryPanel').classList.remove('active');
+                    selectedBarracks = null;
+                }
+                this.showBuildingInfo(hit);
+            } else {
+                document.getElementById('militaryPanel').classList.remove('active');
+                selectedBarracks = null;
+            }
+        }
+
+        isDragging = false;
+        this._didDrag = false;
+    },
+    
+    getBuildingAtTile(tx, ty) {
+        for (let i = buildings.length - 1; i >= 0; i--) {
+            const b = buildings[i];
+            const def = BUILDINGS[b.type];
+            if (tx >= b.tileX && tx < b.tileX + def.tileSize && ty >= b.tileY && ty < b.tileY + def.tileSize) {
+                return b;
+            }
+        }
+        return null;
+    },
+
+    showBuildingInfo(b) {
+        const def = BUILDINGS[b.type];
+        if (!def) return;
+
+        if (!b.isComplete) {
+            const pct = Math.min(100, Math.floor((b.constructionProgress / Math.max(1, b.maxConstructionProgress)) * 100));
+            const needs = [];
+            if (b.woodDelivered < b.woodNeeded) needs.push(`🪵 ${b.woodDelivered}/${b.woodNeeded}`);
+            if (b.stoneDelivered < b.stoneNeeded) needs.push(`🪨 ${b.stoneDelivered}/${b.stoneNeeded}`);
+            if (b.planksDelivered < b.planksNeeded) needs.push(`📦 ${b.planksDelivered}/${b.planksNeeded}`);
+            this.showNotification(`🏗️ ${def.name} – Bau ${pct}%${needs.length ? " | " + needs.join(" ") : ""}`);
+            return;
+        }
+
+        // Simple status per building type
+        let status = '';
+        if (b.type === 'sawmill') {
+            const inWood = b.inputStorage.wood || 0;
+            status = `Input 🪵${inWood} → 📦 Bretter`;
+        } else if (b.type === 'farm') {
+            const out = b.outputStorage.grain || 0;
+            status = `Output 🌾${out}`;
+        } else if (b.type === 'mill') {
+            const inG = b.inputStorage.grain || 0;
+            const outF = b.outputStorage.flour || 0;
+            status = `Input 🌾${inG} | Output 🌪️${outF}`;
+        } else if (b.type === 'bakery') {
+            const inF = b.inputStorage.flour || 0;
+            status = `Input 🌪️${inF} → 🍞`;
+        } else if (b.type === 'weaponsmith') {
+            const bows = b.outputStorage.bows || 0;
+            const spears = b.outputStorage.spears || 0;
+            status = `Output 🏹${bows} 🛡️${spears}`;
+        } else if (b.type === 'watchtower') {
+            status = `Radius ${CONFIG.WATCHTOWER_RADIUS}`;
+        } else if (b.type === 'storage') {
+            status = `Bonus-Lager aktiv`;
+        } else if (b.type === 'house') {
+            status = `Spawnsiedler`;
+        }
+
+        this.showNotification(`${def.symbol} ${def.name}${status ? " – " + status : ""}`);
+    },
+
+    screenToTile(sx, sy) {
+        return {
+            x: Math.floor((sx - camera.x) / (CONFIG.TILE_SIZE * camera.zoom)),
+            y: Math.floor((sy - camera.y) / (CONFIG.TILE_SIZE * camera.zoom))
+        };
+    },
+    
+    centerCameraOn(tx, ty) {
+        camera.x = (canvas.width / 2) - (tx * CONFIG.TILE_SIZE * camera.zoom);
+        camera.y = (canvas.height / 2) - (ty * CONFIG.TILE_SIZE * camera.zoom);
+    },
+
+    // Zoom around a screen point (defaults to screen center). Keeps the world-point under the cursor stable.
+    zoom(factor, sx = canvas.width / 2, sy = canvas.height / 2) {
+        const oldZoom = camera.zoom;
+        const newZoom = Math.min(CONFIG.CAMERA.maxZoom, Math.max(CONFIG.CAMERA.minZoom, oldZoom * factor));
+        if (newZoom === oldZoom) return;
+
+        const worldX = (sx - camera.x) / (CONFIG.TILE_SIZE * oldZoom);
+        const worldY = (sy - camera.y) / (CONFIG.TILE_SIZE * oldZoom);
+
+        camera.zoom = newZoom;
+
+        camera.x = sx - worldX * CONFIG.TILE_SIZE * newZoom;
+        camera.y = sy - worldY * CONFIG.TILE_SIZE * newZoom;
+    },
+
+    zoomIn() {
+        this.zoom(1.15);
+    },
+    
+    zoomOut() {
+        this.zoom(1/1.15);
+    },
+    
+    enterBuildMode(bt) {
+        selectedBuilding = bt; isBuildMode = true;
+        document.getElementById('buildMenu').classList.remove('active');
+        document.querySelectorAll('.build-item').forEach(i => i.classList.remove('selected'));
+        document.querySelector(`[data-building="${bt}"]`).classList.add('selected');
+        // Build popup intentionally disabled on mobile (no buildStatus overlay)
+        // (document.getElementById('buildStatusText') || {style:{},textContent:''}).textContent = `${BUILDINGS[bt].name} bauen`;
+        // document.getElementById('buildStatus').style.display = 'block';
+        document.getElementById('cancelBuildBtn').classList.add('active');
+        document.getElementById('buildMenuBtn').classList.remove('active');
+        document.getElementById('militaryPanel').classList.remove('active');
+    },
+    
+    exitBuildMode() {
+        selectedBuilding = null; isBuildMode = false;
+        const bs = document.getElementById('buildStatus');
+        if (bs) bs.style.display = 'none';
+        document.getElementById('cancelBuildBtn').classList.remove('active');
+        document.querySelectorAll('.build-item').forEach(i => i.classList.remove('selected'));
+        selectedBarracks = null;
+    },
+    
+    tryBuild(tx, ty) {
+        if (!selectedBuilding) return;
+        const def = BUILDINGS[selectedBuilding];
+        
+        if (selectedBuilding !== 'hq' && !this.canBuildInFog(tx, ty, def.tileSize)) {
+            this.showNotification('❌ Außerhalb des Territoriums!');
+            return;
+        }
+        
+        if (this.canBuildAt(tx, ty, selectedBuilding)) {
+            const costStr = document.querySelector(`[data-building="${selectedBuilding}"]`).dataset.cost;
+            if (this.canAfford(costStr)) {
+                this.startConstruction(tx, ty, selectedBuilding);
+                this.exitBuildMode();
+            }
+        }
+    },
+    
+    canAfford(costStr) {
+        if (!costStr) return true;
+        for (const cost of costStr.split(',')) {
+            const [res, amt] = cost.split(':');
+            if (Resources[res] < parseInt(amt)) return false;
+        }
+        return true;
+    },
+    
+
+    // NOTE: Für Gebäude-Baustellen NICHT vorab Ressourcen abziehen.
+// Material wird durch Carrier geliefert (Abzug beim "Abholen" am HQ).
+spend(costStr) {
+    return this.canAfford(costStr);
+},
+updateResourceDisplay() {
+        document.getElementById('woodCount').textContent = Math.floor(Resources.wood);
+        document.getElementById('stoneCount').textContent = Math.floor(Resources.stone);
+        document.getElementById('foodCount').textContent = Math.floor(Resources.food);
+        document.getElementById('popCount').textContent = Resources.pop + '/' + Resources.popMax;
+        document.getElementById('plankCount').textContent = Math.floor(Resources.planks);
+        document.getElementById('weaponCount').textContent = Math.floor(Resources.weapons);
+        
+        // Update resource bars
+        const updateBar = (res, id) => {
+            const percent = (Resources[res] / storageLimits[res]) * 100;
+            const bar = document.getElementById(id);
+            bar.style.width = Math.min(percent, 100) + '%';
+            bar.className = 'resource-fill' + (percent > 90 ? ' critical' : percent > 70 ? ' warning' : '');
+        };
+        
+        updateBar('wood', 'woodBar');
+        updateBar('stone', 'stoneBar');
+        updateBar('food', 'foodBar');
+        updateBar('planks', 'planksBar');
+        updateBar('weapons', 'weaponsBar');
+        
+        let territoryTiles = 0;
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                if (fogMap[y][x] === 0) territoryTiles++;
+            }
+        }
+        document.getElementById('territorySize').textContent = territoryTiles;        // Update storage details if open
+        if (document.getElementById('storageDetails').classList.contains('active')) {
+            this.updateStorageDetails();
+        }
+    },
+    
+    // RENDERING
+    render() {
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+                // Heartbeat marker (helps detect render issues)
+        ctx.fillStyle = 'rgba(255,0,0,0.25)';
+        ctx.fillRect(6, 6, 6, 6);
+        
+this.renderMap();
+        this.renderDecorTrees();
+        this.renderTerritoryOverlay();
+        this.renderBuildings();
+        this.renderEntities();
+        this.renderParticles();
+        
+        if (isBuildMode && selectedBuilding) this.renderGhost();
+        
+        this.renderMapBorder();
+        this.renderMinimap();
+    },
+    
+    renderMap() {
+        const ts = CONFIG.TILE_SIZE * camera.zoom;
+        
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                const sx = camera.x + x * ts;
+                const sy = camera.y + y * ts;
+                
+                if (sx + ts < 0 || sx > canvas.width || sy + ts < 0 || sy > canvas.height) continue;
+                
+                const tile = map[y][x];
+                const inFog = fogMap[y][x] === 1;
+                
+                let color;
+                switch(tile) {
+                    case 0:
+                        const variation = (Math.sin(x * 0.1) + Math.cos(y * 0.1)) * 15;
+                        color = `rgb(${100 + variation}, ${160 + variation}, ${60 + variation})`;
+                        break;
+                    case 1: color = '#1b5e20'; break;
+                    case 2:
+                        const wave = Math.sin(gameTime * 0.05 + x * 0.1) * 20;
+                        color = `rgb(${21 + wave}, ${101 + wave}, ${192 + wave})`;
+                        break;
+                    case 3: color = '#757575'; break;
+                    case 4:
+                        const m = mountains.find(m => m.x === x && m.y === y);
+                        const height = m ? m.height : 5;
+                        const brightness = Math.min(255, 80 + height * 10);
+                        color = `rgb(${brightness * 0.5}, ${brightness * 0.4}, ${brightness * 0.3})`;
+                        break;
+                    default: color = '#7cb342';
+                }
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(sx, sy, ts + 1, ts + 1);
+                
+                if (inFog) {
+                    ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.FOG_DARKNESS})`;
+                    ctx.fillRect(sx, sy, ts + 1, ts + 1);
+                }
+                
+                if (tile === 1 && !inFog && ts > 8) {
+                    const tree = trees.find(t => t.x === x && t.y === y);
+                    const treeType = tree ? tree.type : 0;
+                    const colors = ['#2e7d32', '#388e3c', '#1b5e20'];
+                    ctx.fillStyle = colors[treeType];
+                    
+                    const cx = sx + ts/2, cy = sy + ts/2;
+                    const size = ts * 0.4;
+                    
+                    if (treeType === 0) {
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, size, 0, Math.PI*2);
+                        ctx.fill();
+                    } else if (treeType === 1) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy - size);
+                        ctx.lineTo(cx + size, cy + size);
+                        ctx.lineTo(cx - size, cy + size);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(cx - size*0.6, cy - size*0.3, size*1.2, size*0.8);
+                    }
+                }
+                
+                if (tile === 4 && !inFog && ts > 12) {
+                    const m = mountains.find(m => m.x === x && m.y === y);
+                    if (m && m.height > 10) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                        ctx.beginPath();
+                        ctx.arc(sx + ts/2, sy + ts/2, ts*0.25, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+    },
+
+    renderDecorTrees() {
+        if (!decorTrees || decorTrees.length === 0) return;
+        for (const t of decorTrees) {
+            // only draw if base tile is still forest
+            if (!map[t.y] || map[t.y][t.x] !== 1) continue;
+            const ts = CONFIG.TILE_SIZE * camera.zoom;
+            const sx = camera.x + (t.x * ts);
+            const sy = camera.y + (t.y * ts);
+            if (sx + ts < 0 || sx > canvas.width || sy + ts < 0 || sy > canvas.height) continue;
+            const meta = SPRITE_META[t.k] || { wTiles: 1.3, yPadTiles: 0.2 };
+            const cx = sx + ts/2;
+            const bottomY = sy + ts;
+            this.drawSprite(t.k, cx, bottomY, meta.wTiles, meta.yPadTiles);
+        }
+    },
+    
+
+    renderTerritoryOverlay() {
+        // Visible territory borders (red dashed) + subtle blue fill.
+        const ts = CONFIG.TILE_SIZE * camera.zoom;
+        ctx.save();
+        ctx.lineWidth = Math.max(2, 2 * camera.zoom);
+        ctx.setLineDash([10, 6]);
+        ctx.strokeStyle = 'rgba(255, 68, 68, 0.9)';
+        ctx.fillStyle = 'rgba(65, 105, 225, 0.14)'; // royal blue tint
+
+        for (const center of territoryCenters) {
+            const cx = camera.x + center.x * ts;
+            const cy = camera.y + center.y * ts;
+            const r = center.radius * ts;
+
+            // Skip if fully off-screen (cheap cull)
+            if (cx + r < -50 || cx - r > canvas.width + 50 || cy + r < -50 || cy - r > canvas.height + 50) continue;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+        ctx.restore();
+    },
+
+    renderBuildings() {
+        for (const b of buildings) {
+            const def = BUILDINGS[b.type];
+            const sx = camera.x + b.x * camera.zoom;
+            const sy = camera.y + b.y * camera.zoom;
+            const sz = CONFIG.TILE_SIZE * def.tileSize * camera.zoom;
+            
+            if (sx + sz < 0 || sx > canvas.width || sy + sz < 0 || sy > canvas.height) continue;
+            
+            if (b.type !== 'hq') {
+                let inFog = true;
+                for (let dy = 0; dy < def.tileSize; dy++) {
+                    for (let dx = 0; dx < def.tileSize; dx++) {
+                        if (fogMap[b.tileY + dy] && fogMap[b.tileY + dy][b.tileX + dx] === 0) { inFog = false; break; }
+                    }
+                    if (!inFog) break;
+                }
+                if (inFog) continue;
+            }
+            
+            if (!b.isComplete) {
+                ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
+                ctx.fillRect(sx + 2, sy + 2, sz - 4, sz - 4);
+                
+                ctx.strokeStyle = '#ff8c00';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]);
+                ctx.strokeRect(sx + 2, sy + 2, sz - 4, sz - 4);
+                ctx.setLineDash([]);
+                
+                const totalNeeded = b.woodNeeded + b.stoneNeeded + b.planksNeeded;
+                const totalDelivered = b.woodDelivered + b.stoneDelivered + b.planksDelivered;
+                const matProgress = totalNeeded > 0 ? totalDelivered / totalNeeded : 1;
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(sx + 5, sy - 20, sz - 10, 12);
+                ctx.fillStyle = matProgress >= 1 ? '#4caf50' : '#ff9800';
+                ctx.fillRect(sx + 5, sy - 20, (sz - 10) * matProgress, 12);
+                
+                if (sz > 40) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 9px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`🪵${b.woodDelivered}/${b.woodNeeded} 🪨${b.stoneDelivered}/${b.stoneNeeded} 📦${b.planksDelivered}/${b.planksNeeded}`, sx + sz/2, sy - 25);
+                }
+                
+                if (matProgress >= 1) {
+                    const buildProgress = b.constructionProgress / b.maxConstructionProgress;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(sx + 5, sy - 38, sz - 10, 12);
+                    ctx.fillStyle = '#2196f3';
+                    ctx.fillRect(sx + 5, sy - 38, (sz - 10) * buildProgress, 12);
+                    
+                    if (sz > 40) {
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 10px Arial';
+                        ctx.fillText('Baue...', sx + sz/2, sy - 42);
+                    }
+                }
+                
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = BUILDINGS[b.type].color;
+                ctx.fillRect(sx + 2, sy + 2, sz - 4, sz - 4);
+                ctx.globalAlpha = 1.0;
+            } else {
+                // Try sprite first (if loaded); fallback to vector render
+                if (this.drawBuildingSprite(b, def)) {
+                    continue;
+                }
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(sx + 4, sy + sz - 6, sz - 8, 6);
+                
+                const gradient = ctx.createLinearGradient(sx, sy, sx, sy + sz);
+                gradient.addColorStop(0, def.color);
+                gradient.addColorStop(1, this.darkenColor(def.color, 30));
+                ctx.fillStyle = gradient;
+                ctx.fillRect(sx + 2, sy + 2, sz - 4, sz - 4);
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx.fillRect(sx + 2, sy + 2, sz - 4, sz * 0.3);
+                
+                if (sz > 20) {
+                    ctx.font = `${Math.floor(sz * 0.5)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(def.symbol, sx + sz/2, sy + sz/2);
+                }
+                
+                ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 2, sy + 2, sz - 4, sz - 4);
+                
+                if (b.type === 'watchtower' && sz > 30) {
+                    ctx.fillStyle = b.soldiers >= 2 ? '#4caf50' : '#f44336';
+                    ctx.beginPath();
+                    ctx.arc(sx + sz - 10, sy + 10, 6, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 9px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${b.soldiers}/2`, sx + sz - 10, sy + 13);
+                }
+                
+                if (b.type === 'barracks' && sz > 30) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`⚔️${soldiers.filter(s => s.patrolCenter.x === b.workX + 0.5).length}`, sx + sz - 5, sy + 15);
+                }
+                
+                if (def.maxWorkers > 0 && sz > 25) {
+                    const workerCount = workers.filter(w => w.buildingId === b.id).length;
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`👷${workerCount}`, sx + sz - 5, sy + sz - 10);
+                }
+                
+                if ((b.type === 'sawmill' || b.type === 'weaponsmith') && sz > 40 && b.productionTimer > 0) {
+                    const progress = b.productionTimer / def.workTime;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(sx + 5, sy - 10, sz - 10, 6);
+                    ctx.fillStyle = '#ffeb3b';
+                    ctx.fillRect(sx + 5, sy - 10, (sz - 10) * progress, 6);
+                }
+                
+                if (b.type === 'barracks' && b === selectedBarracks) {
+                    ctx.strokeStyle = '#ffeb3b';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(sx - 2, sy - 2, sz + 4, sz + 4);
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+    },
+    
+    renderEntities() {
+        for (const s of settlers) {
+            const sx = camera.x + s.x * camera.zoom;
+            const sy = camera.y + s.y * camera.zoom;
+            const r  = Math.max(4, 10 * camera.zoom);
+
+            if (sx < -20 || sx > canvas.width + 20 || sy < -20 || sy > canvas.height + 20) continue;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy + r * 0.9, r * 1.0, r * 0.55, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Body color by role
+            const bodyCol = (s.role === 'carrier') ? '#ff9800' : '#4169e1';
+
+            // Body (with outline)
+            ctx.fillStyle = bodyCol;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = Math.max(1, 2 * camera.zoom);
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+            ctx.stroke();
+
+            // Head
+            ctx.fillStyle = '#ffcc80';
+            ctx.beginPath();
+            ctx.arc(sx, sy - r * 0.9, r * 0.72, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.stroke();
+
+            // Tiny legs (simple)
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+            ctx.lineWidth = Math.max(1, 1.5 * camera.zoom);
+            ctx.beginPath();
+            ctx.moveTo(sx - r * 0.35, sy + r * 0.7);
+            ctx.lineTo(sx - r * 0.55, sy + r * 1.15);
+            ctx.moveTo(sx + r * 0.35, sy + r * 0.7);
+            ctx.lineTo(sx + r * 0.55, sy + r * 1.15);
+            ctx.stroke();
+
+            // Carry indicator
+            if (s.carrying) {
+                ctx.fillStyle = '#fff';
+                ctx.font = `${Math.max(9, 14 * camera.zoom)}px sans-serif`;
+                const icon = s.carrying === 'wood' ? '🪵' : s.carrying === 'stone' ? '🪨' : s.carrying === 'planks' ? '📦' : '•';
+                ctx.fillText(icon, sx + r * 0.9, sy - r * 0.2);
+            }
+
+            // State indicator (busy)
+            if (s.state !== 'idle') {
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.lineWidth = Math.max(1, 1.5 * camera.zoom);
+                ctx.beginPath();
+                ctx.arc(sx, sy, r + 2 * camera.zoom, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+for (const w of workers) {
+            const sx = camera.x + w.x * camera.zoom;
+            const sy = camera.y + w.y * camera.zoom;
+            const sz = Math.max(3, 8 * camera.zoom);
+            
+            if (sx < -10 || sx > canvas.width + 10 || sy < -10 || sy > canvas.height + 10) continue;
+            
+            const building = buildings.find(b => b.id === w.buildingId);
+            let color = '#8bc34a';
+            if (building) {
+                if (building.type === 'lumberjack') color = '#8b4513';
+                else if (building.type === 'stonemason') color = '#757575';
+                else if (building.type === 'farm') color = '#ff9800';
+                else if (building.type === 'sawmill') color = '#deb887';
+            }
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffcc80';
+            ctx.beginPath();
+            ctx.arc(sx, sy - sz * 0.8, sz * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (w.carrying) {
+                const colors = { wood: '#8b4513', stone: '#757575', food: '#ffd700' };
+                ctx.fillStyle = colors[w.carrying];
+                ctx.fillRect(sx - sz * 0.8, sy - sz * 1.8, sz * 1.6, sz * 0.8);
+            }
+        }
+        
+        for (const s of soldiers) {
+            const sx = camera.x + s.x * camera.zoom;
+            const sy = camera.y + s.y * camera.zoom;
+            const sz = Math.max(5, 12 * camera.zoom);
+            
+            if (sx < -15 || sx > canvas.width + 15 || sy < -15 || sy > canvas.height + 15) continue;
+            
+            if (s.weapon === 'bow') {
+                ctx.fillStyle = '#2e7d32';
+                ctx.beginPath();
+                ctx.moveTo(sx, sy - sz);
+                ctx.lineTo(sx - sz, sy + sz);
+                ctx.lineTo(sx + sz, sy + sz);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#8b4513';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(sx + sz, sy, sz * 0.8, -Math.PI/2, Math.PI/2);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = '#c62828';
+                ctx.beginPath();
+                ctx.moveTo(sx, sy - sz);
+                ctx.lineTo(sx - sz, sy + sz);
+                ctx.lineTo(sx + sz, sy + sz);
+                ctx.fill();
+                
+                ctx.fillStyle = '#5d4037';
+                ctx.beginPath();
+                ctx.arc(sx - sz * 0.5, sy, sz * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.arc(sx, sy - sz * 0.3, sz * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        for (const e of enemies) {
+            const sx = camera.x + e.x * camera.zoom;
+            const sy = camera.y + e.y * camera.zoom;
+            const sz = Math.max(6, 14 * camera.zoom);
+            
+            if (sx < -20 || sx > canvas.width + 20 || sy < -20 || sy > canvas.height + 20) continue;
+            
+            if (e.type === 'wolf') {
+                ctx.fillStyle = '#757575';
+                ctx.beginPath();
+                ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(sx - sz * 0.7, sy - sz * 0.5);
+                ctx.lineTo(sx - sz * 0.9, sy - sz * 1.2);
+                ctx.lineTo(sx - sz * 0.3, sy - sz * 0.7);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(sx + sz * 0.7, sy - sz * 0.5);
+                ctx.lineTo(sx + sz * 0.9, sy - sz * 1.2);
+                ctx.lineTo(sx + sz * 0.3, sy - sz * 0.7);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#5d4037';
+                ctx.beginPath();
+                ctx.arc(sx, sy, sz * 1.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            const hpPercent = e.hp / (e.type === 'wolf' ? 30 : 60);
+            ctx.fillStyle = '#f44336';
+            ctx.fillRect(sx - sz, sy - sz * 1.8, sz * 2, 4);
+            ctx.fillStyle = '#4caf50';
+            ctx.fillRect(sx - sz, sy - sz * 1.8, sz * 2 * hpPercent, 4);
+        }
+    },
+    
+    renderParticles() {
+        for (const p of particles) {
+            const sx = camera.x + p.x * camera.zoom;
+            const sy = camera.y + p.y * camera.zoom;
+            
+            ctx.globalAlpha = p.life / 50;
+            ctx.fillStyle = p.color;
+            
+            if (p.type === 'blood') {
+                ctx.beginPath();
+                ctx.arc(sx, sy, p.size * camera.zoom, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillRect(sx - p.size/2, sy - p.size/2, p.size, p.size);
+            }
+        }
+        ctx.globalAlpha = 1;
+    },
+    
+    renderGhost() {
+        const t = this.screenToTile(mousePos.x, mousePos.y);
+        const def = BUILDINGS[selectedBuilding];
+        const canBuild = this.canBuildAt(t.x, t.y, selectedBuilding) && this.canBuildInFog(t.x, t.y, def.tileSize);
+        
+        const sx = camera.x + t.x * CONFIG.TILE_SIZE * camera.zoom;
+        const sy = camera.y + t.y * CONFIG.TILE_SIZE * camera.zoom;
+        const sz = CONFIG.TILE_SIZE * def.tileSize * camera.zoom;
+        
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = canBuild ? 'rgba(0,255,0,0.3)' : 'rgba(255,0,0,0.3)';
+        ctx.fillRect(sx, sy, sz, sz);
+        ctx.globalAlpha = 1.0;
+        
+        ctx.strokeStyle = canBuild ? '#0f0' : '#f00';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(sx, sy, sz, sz);
+        ctx.setLineDash([]);
+        
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = def.color;
+        ctx.fillRect(sx + 2, sy + 2, sz - 4, sz - 4);
+        ctx.globalAlpha = 1.0;
+        
+        ctx.font = `${Math.floor(sz * 0.4)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(def.symbol, sx + sz/2, sy + sz/2);
+    },
+    
+    renderMapBorder() {
+        const mpw = CONFIG.MAP_WIDTH * CONFIG.TILE_SIZE * camera.zoom;
+        const mph = CONFIG.MAP_HEIGHT * CONFIG.TILE_SIZE * camera.zoom;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(camera.x, camera.y, mpw, mph);
+    },
+    
+    renderMinimap() {
+        const scx = minimapCanvas.width / CONFIG.MAP_WIDTH;
+        const scy = minimapCanvas.height / CONFIG.MAP_HEIGHT;
+        
+        minimapCtx.fillStyle = '#1a1a1a';
+        minimapCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+        
+        for (let y = 0; y < CONFIG.MAP_HEIGHT; y += 2) {
+            for (let x = 0; x < CONFIG.MAP_WIDTH; x += 2) {
+                const tile = map[y][x];
+                const inFog = fogMap[y][x] === 1;
+                
+                if (inFog) minimapCtx.fillStyle = '#0a0a0a';
+                else {
+                    switch(tile) {
+                        case 0: minimapCtx.fillStyle = '#7cb342'; break;
+                        case 1: minimapCtx.fillStyle = '#1b5e20'; break;
+                        case 2: minimapCtx.fillStyle = '#1565c0'; break;
+                        case 3: minimapCtx.fillStyle = '#757575'; break;
+                        case 4: minimapCtx.fillStyle = '#5d4037'; break;
+                        default: minimapCtx.fillStyle = '#7cb342';
+                    }
+                }
+                minimapCtx.fillRect(x * scx, y * scy, scx * 2, scy * 2);
+            }
+        }
+        
+        for (const b of buildings) {
+            const def = BUILDINGS[b.type];
+            minimapCtx.fillStyle = b.isComplete ? def.color : '#ff8c00';
+            minimapCtx.fillRect(b.tileX * scx, b.tileY * scy, scx * def.tileSize, scy * def.tileSize);
+        }
+        
+        minimapCtx.strokeStyle = 'rgba(65, 105, 225, 0.5)';
+        minimapCtx.lineWidth = 1;
+        for (const center of territoryCenters) {
+            minimapCtx.beginPath();
+            minimapCtx.arc(center.x * scx, center.y * scy, center.radius * scx, 0, Math.PI * 2);
+            minimapCtx.stroke();
+        }
+        
+        const mpw = CONFIG.MAP_WIDTH * CONFIG.TILE_SIZE * camera.zoom;
+        const mph = CONFIG.MAP_HEIGHT * CONFIG.TILE_SIZE * camera.zoom;
+        const vx = (-camera.x / mpw) * minimapCanvas.width;
+        const vy = (-camera.y / mph) * minimapCanvas.height;
+        const vw = (canvas.width / mpw) * minimapCanvas.width;
+        const vh = (canvas.height / mph) * minimapCanvas.height;
+        
+        minimapCtx.strokeStyle = '#ff0000';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.strokeRect(vx, vy, vw, vh);
+    },
+    
+    darkenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max((num >> 16) - amt, 0);
+        const G = Math.max((num >> 8 & 0x00FF) - amt, 0);
+        const B = Math.max((num & 0x0000FF) - amt, 0);
+        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+    },
+    
+    loop() {
+        this.update();
+        this.render();
+        requestAnimationFrame(() => this.loop());
+    }
+};
+
+window.addEventListener('DOMContentLoaded', () => game.init());
+
+</script>
+</body>
+</html>
